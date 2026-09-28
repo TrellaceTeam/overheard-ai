@@ -175,8 +175,11 @@ use. The setup check's extractor probe sends the same shape, so a passing check 
 passing run. A model that still returns the wrong shape sends the same stored answer up the
 extraction ladder inside the one claim: the same provider's next tier up, then the cheapest
 keyed extractor, two escalations at most, each billed and logged like any extraction call.
-Only a ladder whose every reader fails fails the task, with `EXTRACTION_UNREADABLE`, which
-the run page shows as "We could not read this answer"; its Retry walks the ladder again.
+A reply that stopped at the output token cap climbs the same way and is never parsed, because
+a cut-off JSON list can still parse with brands missing. Only a ladder whose every reader
+fails fails the task: with `EXTRACTION_TRUNCATED` when every reader ran out of tokens, shown as
+"The model that reads answers ran out of room", and with `EXTRACTION_UNREADABLE` otherwise,
+shown as "We could not read this answer". Retry on either walks the ladder again.
 
 Perception tasks use the same two phases with different prompts: the answer is read into
 four sections instead of mined for brands, and a database trigger refuses any brand

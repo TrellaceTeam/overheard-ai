@@ -75,7 +75,7 @@ The block at the top of the Prompts tab that holds which assistants a run asks, 
 _Avoid_: run bar, launch panel
 
 **Extraction ladder**:
-The invisible order of readers a stored answer climbs when the extraction model replies in the wrong shape: the same provider's next tier up, then the cheapest extractor whose provider has a key, two escalations at most, every attempt logged like any extraction call. Only an exhausted ladder fails the answer.
+The invisible order of readers a stored answer climbs when the extraction model replies in the wrong shape or runs out of output tokens: the same provider's next tier up, then the cheapest extractor whose provider has a key, two escalations at most, every attempt logged like any extraction call. Only an exhausted ladder fails the answer.
 _Avoid_: fallback chain, retry ladder
 
 ### Measuring

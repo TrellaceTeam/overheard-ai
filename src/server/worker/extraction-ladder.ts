@@ -1,6 +1,6 @@
 /**
  * The extraction ladder: the readers one stored answer climbs through when a
- * model replies in the wrong shape.
+ * model replies in the wrong shape or stops at its output cap.
  *
  * Shape enforcement in the request (see extraction.ts) makes a wrong-shape
  * reply rare, not impossible, and the answer behind it came from a searching
@@ -93,8 +93,9 @@ export type LadderCall = (model: ModelRow, system: string, user: string) => Prom
 
 export interface LadderHooks {
   /**
-   * A rung answered in the wrong shape. Called with the reply that was thrown
-   * away, before the next rung is bought, because that reply was still billed.
+   * A rung answered in the wrong shape or stopped at its output cap. Called
+   * with the reply that was thrown away, before the next rung is bought,
+   * because that reply was still billed.
    */
   onViolation?: ((model: ModelRow, result: ProviderResult) => void) | undefined;
   /** A rung's call itself failed. Called before the error propagates out. */
@@ -115,11 +116,17 @@ export interface LadderOutcome {
  */
 export const UNREADABLE_PREFIX = "EXTRACTION_UNREADABLE";
 
+/** The stored failure code when every rung stopped at its output cap. */
+export const TRUNCATED_PREFIX = "EXTRACTION_TRUNCATED";
+
 /**
  * Walks the rungs until one parses. A provider error (429, timeout, a hard
  * 4xx) is not a shape violation. It propagates at once, after the onCallError
  * hook, and the task's normal retry budget applies. The ladder is for models
- * that answered in the wrong shape.
+ * that answered in the wrong shape or ran out of output tokens.
+ *
+ * A reply cut off at the cap is never parsed. A partial JSON list can still
+ * parse, and would score the answer with brands missing.
  *
  * Running out of rungs raises a non-retryable ProviderError, so the task fails
  * instead of buying the whole ladder again automatically.
@@ -136,6 +143,7 @@ export async function walkExtractionLadder(
   hooks: LadderHooks = {},
 ): Promise<LadderOutcome> {
   let lastViolation: unknown = null;
+  let truncations = 0;
   for (const model of rungs) {
     let result: ProviderResult;
     try {
@@ -144,6 +152,12 @@ export async function walkExtractionLadder(
       hooks.onCallError?.(model, error);
       throw error;
     }
+    if (result.truncated) {
+      truncations += 1;
+      lastViolation = new Error(`${TRUNCATED_PREFIX}: stopped at the output token limit`);
+      hooks.onViolation?.(model, result);
+      continue;
+    }
     try {
       return { extraction: parse(result.text), model, result };
     } catch (violation) {
@@ -151,9 +165,18 @@ export async function walkExtractionLadder(
       hooks.onViolation?.(model, result);
     }
   }
+  const readers = `${rungs.length} ${rungs.length === 1 ? "reader" : "readers"}`;
+  if (truncations === rungs.length) {
+    throw new ProviderError(
+      `${TRUNCATED_PREFIX}: ${readers} stopped at the output token limit before finishing`,
+      400,
+      "EXTRACTION_TRUNCATED",
+    );
+  }
   const detail = lastViolation instanceof Error ? lastViolation.message : String(lastViolation);
+  const what = truncations === 0 ? "replied in the wrong shape" : "gave no usable reply";
   throw new ProviderError(
-    `${UNREADABLE_PREFIX}: ${rungs.length} ${rungs.length === 1 ? "reader" : "readers"} replied in the wrong shape (last: ${detail})`,
+    `${UNREADABLE_PREFIX}: ${readers} ${what} (last: ${detail})`,
     400,
     "EXTRACTION_UNREADABLE",
   );

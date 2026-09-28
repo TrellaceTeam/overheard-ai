@@ -553,12 +553,12 @@ async function perceptionPhase(
 
   let fields: PerceptionFields;
   try {
-    fields = parsePerception(raw.text);
+    fields = readPerception(raw);
   } catch {
     logUsage(db, task, model, "extraction", raw, "retried");
     try {
       raw = await call(PERCEPTION_SYSTEM, user);
-      fields = parsePerception(raw.text);
+      fields = readPerception(raw);
     } catch (err) {
       if (mayHaveBilled(err)) logFailedUsage(db, task, model, "extraction");
       throw err;
@@ -575,6 +575,14 @@ async function perceptionPhase(
   markTaskDone(db, task.id);
   logUsage(db, task, model, "extraction", raw, "success");
   updateRunProgress(db, task.run_id);
+}
+
+/** A reply cut off at the output cap is never parsed, so no partial summary is stored. */
+function readPerception(raw: ProviderResult): PerceptionFields {
+  if (raw.truncated) {
+    throw new Error("EXTRACTION_TRUNCATED: the reader stopped at the output token limit");
+  }
+  return parsePerception(raw.text);
 }
 
 /**

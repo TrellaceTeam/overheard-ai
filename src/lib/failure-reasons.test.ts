@@ -134,6 +134,17 @@ describe("classifyFailure, legacy prose rows", () => {
     );
   });
 
+  it("tells a reader that ran out of room apart from one that replied in the wrong shape", () => {
+    const reason = classifyFailure({
+      code: "EXTRACTION_TRUNCATED",
+      error: "EXTRACTION_TRUNCATED: 2 readers stopped at the output token limit before finishing",
+    });
+    expect(reason.key).toBe("extraction-truncated");
+    expect(reason.owner).toBeNull();
+    expect(reason.title).toBe("The model that reads answers ran out of room");
+    expect(reason.advice).not.toMatch(/format/);
+  });
+
   it("asks nobody to report anything, since there is nobody to report to", () => {
     // This tool has no account, no support desk and no telemetry, so no copy
     // may ask a local user to "tell us".

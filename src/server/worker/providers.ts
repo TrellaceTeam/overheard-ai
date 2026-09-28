@@ -45,6 +45,13 @@ export type ProviderResult = {
    * text can then say why, instead of reading as an empty answer.
    */
   stopReason?: string | undefined;
+  /**
+   * The provider stopped at the output token cap, so the text may be empty or
+   * cut off mid-reply. OpenAI says finish_reason "length" or an incomplete
+   * response, Anthropic stop_reason "max_tokens", Gemini finishReason
+   * "MAX_TOKENS".
+   */
+  truncated?: boolean | undefined;
 };
 
 /** The usage part of a result, which a rejected call is still billed for. */
@@ -133,8 +140,13 @@ export function timeoutForRetry(lastFailure: StoredFailure): number {
  */
 export const ANSWER_MAX_TOKENS = 8192;
 
-/** Extraction returns a JSON list, which needs a little more headroom. */
-export const EXTRACTION_MAX_TOKENS = 2048;
+/**
+ * Output token cap for every call to the extraction model. Reasoning spends
+ * the same allowance as the JSON, and extraction runs at the model's default
+ * effort, so a long answer can take a reader close to 2,000 tokens. Output is
+ * billed as used, so a high cap costs nothing until a reply needs it.
+ */
+export const EXTRACTION_MAX_TOKENS = 8192;
 
 /**
  * Output cap for the extractor probe. The probe sends the enforced extraction
@@ -448,7 +460,7 @@ function totalOf(input: number | null, output: number | null): number | null {
 }
 
 type ChatCompletion = {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   usage?: {
     total_tokens?: number;
     prompt_tokens?: number;
@@ -468,6 +480,7 @@ function fromChatCompletion(json: unknown, searchCalls = 0): ProviderResult {
     outputTokens,
     tokens: data.usage?.total_tokens ?? totalOf(inputTokens, outputTokens),
     searchCalls: data.usage?.num_search_queries ?? searchCalls,
+    truncated: data.choices?.[0]?.finish_reason === "length",
   };
 }
 
@@ -505,6 +518,8 @@ type ResponsesApi = {
     }>;
   }>;
   output_text?: string;
+  status?: string;
+  incomplete_details?: { reason?: string } | null;
   usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
 };
 
@@ -547,6 +562,8 @@ function fromResponses(json: unknown): ProviderResult {
     searchCalls: items.filter(
       (item) => item.type === "web_search_call" && item.status === "completed",
     ).length,
+    truncated:
+      data.status === "incomplete" && data.incomplete_details?.reason === "max_output_tokens",
   };
 }
 
@@ -793,6 +810,7 @@ export async function callProvider({
         tokens: totalOf(inputTokens, outputTokens),
         searchCalls,
         stopReason,
+        truncated: stopReason === "max_tokens",
       };
     }
     case "google": {
@@ -823,6 +841,7 @@ export async function callProvider({
         candidates?: Array<{
           content?: { parts?: Array<{ text?: string }> };
           groundingMetadata?: GeminiGrounding;
+          finishReason?: string;
         }>;
         usageMetadata?: {
           totalTokenCount?: number;
@@ -843,6 +862,7 @@ export async function callProvider({
         outputTokens,
         tokens: json.usageMetadata?.totalTokenCount ?? totalOf(inputTokens, outputTokens),
         searchCalls: candidate?.groundingMetadata?.webSearchQueries?.length ?? 0,
+        truncated: candidate?.finishReason === "MAX_TOKENS",
       };
     }
   }

@@ -76,6 +76,10 @@ describe("deriveCodeFromMessage", () => {
     expect(
       deriveCodeFromMessage("EXTRACTION_UNREADABLE: 3 readers replied in the wrong shape"),
     ).toBe("EXTRACTION_UNREADABLE");
+    // The perception reader throws a plain Error, so its code comes from here.
+    expect(
+      deriveCodeFromMessage("EXTRACTION_TRUNCATED: the reader stopped at the output token limit"),
+    ).toBe("EXTRACTION_TRUNCATED");
   });
 
   it("reads the HTTP status line into the param", () => {

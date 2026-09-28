@@ -1,6 +1,6 @@
 /**
  * The extraction ladder: the readers one stored answer climbs through when a
- * model replies in the wrong shape.
+ * model replies in the wrong shape or stops at its output cap.
  *
  * The order tests run against a real seeded database, because the ladder
  * depends on the catalog and the keys in the environment. The walk tests
@@ -15,6 +15,7 @@ import {
   extractionLadder,
   LADDER_MAX_RUNGS,
   nextTierUp,
+  TRUNCATED_PREFIX,
   UNREADABLE_PREFIX,
   walkExtractionLadder,
 } from "./extraction-ladder";
@@ -214,6 +215,46 @@ describe("walkExtractionLadder", () => {
     const call = vi.fn().mockResolvedValue(result("rubbish"));
     await expect(walkExtractionLadder([model("m1")], "s", "u", call, parse)).rejects.toThrow(
       /1 reader replied/,
+    );
+  });
+
+  it("never parses a reply cut off at the output cap, even one that would parse", async () => {
+    // A partial list can be valid JSON and would score the answer with brands missing.
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce({ ...result("good"), truncated: true })
+      .mockResolvedValueOnce(result("good"));
+    const onViolation = vi.fn();
+    const walked = await walkExtractionLadder([model("m1"), model("m2")], "s", "u", call, parse, {
+      onViolation,
+    });
+    expect(walked.model.model_id).toBe("m2");
+    expect(onViolation).toHaveBeenCalledTimes(1);
+    expect(onViolation.mock.calls[0]?.[0]?.model_id).toBe("m1");
+  });
+
+  it("blames the output cap, not the shape, when every reader ran out of tokens", async () => {
+    const call = vi.fn().mockResolvedValue({ ...result(""), truncated: true });
+    const promise = walkExtractionLadder([model("m1"), model("m2")], "s", "u", call, parse);
+    await expect(promise).rejects.toMatchObject({
+      status: 400,
+      retryable: false,
+      code: "EXTRACTION_TRUNCATED",
+    });
+    await expect(promise).rejects.toThrow(
+      new RegExp(`^${TRUNCATED_PREFIX}: 2 readers stopped at the output token limit`),
+    );
+  });
+
+  it("does not call a mix of cut-off and wrong-shape replies a wrong shape", async () => {
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce({ ...result(""), truncated: true })
+      .mockResolvedValueOnce(result("rubbish"));
+    const promise = walkExtractionLadder([model("m1"), model("m2")], "s", "u", call, parse);
+    await expect(promise).rejects.toMatchObject({ code: "EXTRACTION_UNREADABLE" });
+    await expect(promise).rejects.toThrow(
+      /^EXTRACTION_UNREADABLE: 2 readers gave no usable reply \(last: SCHEMA_VIOLATION/,
     );
   });
 

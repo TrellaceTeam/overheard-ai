@@ -1095,6 +1095,19 @@ describe("the perception phase", () => {
     );
     expect(writePerceptionSummary).toHaveBeenCalled();
   });
+
+  it("never stores a summary from a reply cut off at the output cap", async () => {
+    (getStoredAnswerText as Mock).mockReturnValue("an answer");
+    (callExtractionModel as Mock)
+      .mockResolvedValueOnce({ ...providerResult(PERCEPTION_JSON), truncated: true })
+      .mockResolvedValueOnce(providerResult(PERCEPTION_JSON));
+    claimOnce([perception()]);
+
+    await runWorkerPass(db);
+
+    expect(callExtractionModel).toHaveBeenCalledTimes(2);
+    expect(writePerceptionSummary).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("finalisation", () => {

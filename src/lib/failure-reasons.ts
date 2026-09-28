@@ -166,6 +166,18 @@ function unreadableCard(): Card {
   };
 }
 
+function truncatedCard(): Card {
+  // Every reader tried spent its whole output allowance, reasoning included,
+  // before the JSON was finished. The reply was never parsed.
+  return {
+    key: "extraction-truncated",
+    owner: null,
+    title: "The model that reads answers ran out of room",
+    advice:
+      "It reached its length limit before it finished reading the answer, so nothing could be scored. It is rare and usually happens on very long answers. Retry reads those answers again.",
+  };
+}
+
 function schemaViolationCard(): Card {
   return {
     key: "schema-violation",
@@ -276,6 +288,8 @@ function classifyCode(parsed: ParsedFailureCode): Card | null {
       return noWebSearchCard();
     case "EXTRACTION_UNREADABLE":
       return unreadableCard();
+    case "EXTRACTION_TRUNCATED":
+      return truncatedCard();
     case "SCHEMA_VIOLATION":
       return schemaViolationCard();
     case "HTTP": {

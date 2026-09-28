@@ -1247,3 +1247,83 @@ describe("enforcing the extraction shape", () => {
     delete process.env["OVERHEARD_MOCK_PROVIDERS"];
   });
 });
+
+describe("reporting a reply cut off at the output cap", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function reply(
+    provider: "openai" | "anthropic" | "google",
+    response: unknown,
+    webSearch = false,
+  ) {
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify(response), {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    return callProvider({
+      provider,
+      modelId: "reader",
+      apiKey: "test-key",
+      system: "system",
+      user: "user",
+      jsonMode: !webSearch,
+      webSearch,
+      ...(webSearch ? {} : { jsonSchema: EXTRACTION_SHAPE }),
+    });
+  }
+
+  it("OpenAI chat completions: finish_reason length", async () => {
+    const cut = await reply("openai", {
+      choices: [{ message: { content: "" }, finish_reason: "length" }],
+      usage: { completion_tokens: 8192 },
+    });
+    expect(cut.truncated).toBe(true);
+    const whole = await reply("openai", {
+      choices: [{ message: { content: "{}" }, finish_reason: "stop" }],
+      usage: {},
+    });
+    expect(whole.truncated).toBe(false);
+  });
+
+  it("OpenAI responses: an incomplete response for max_output_tokens, and nothing else", async () => {
+    const cut = await reply(
+      "openai",
+      { status: "incomplete", incomplete_details: { reason: "max_output_tokens" }, output: [] },
+      true,
+    );
+    expect(cut.truncated).toBe(true);
+    const filtered = await reply(
+      "openai",
+      { status: "incomplete", incomplete_details: { reason: "content_filter" }, output: [] },
+      true,
+    );
+    expect(filtered.truncated).toBe(false);
+  });
+
+  it("Anthropic: stop_reason max_tokens", async () => {
+    const cut = await reply("anthropic", { content: [], stop_reason: "max_tokens", usage: {} });
+    expect(cut.truncated).toBe(true);
+    const whole = await reply("anthropic", { content: [], stop_reason: "tool_use", usage: {} });
+    expect(whole.truncated).toBe(false);
+  });
+
+  it("Gemini: finishReason MAX_TOKENS", async () => {
+    const cut = await reply("google", {
+      candidates: [
+        { content: { parts: [{ text: '{"answer_format":' }] }, finishReason: "MAX_TOKENS" },
+      ],
+      usageMetadata: {},
+    });
+    expect(cut.truncated).toBe(true);
+    const whole = await reply("google", {
+      candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }],
+      usageMetadata: {},
+    });
+    expect(whole.truncated).toBe(false);
+  });
+});

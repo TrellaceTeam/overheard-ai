@@ -45,6 +45,8 @@ export const FAILURE_CODES = [
   "HTTP",
   /** Every reader on the extraction ladder replied in the wrong shape. */
   "EXTRACTION_UNREADABLE",
+  /** Every reader tried stopped at its output token limit before finishing. */
+  "EXTRACTION_TRUNCATED",
   /** One reader replied in the wrong shape (the perception path, and prose-only rows). */
   "SCHEMA_VIOLATION",
   /** A throw this codebase did not recognise: a bug, or a new failure kind. */
