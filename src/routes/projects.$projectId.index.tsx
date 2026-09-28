@@ -646,8 +646,10 @@ function Dashboard() {
             {target ? target.name : "Your brand"} across AI assistants
           </h2>
           <p className="type-meta">
+            {/* Counted from the runs the cards add up, not the Runs list, which
+                holds only the newest 20. */}
             {latestRun
-              ? `Aggregate of ${completedRuns} completed run${completedRuns === 1 ? "" : "s"}, latest ${new Date(latestRun.createdAt).toLocaleString()}`
+              ? `Aggregate of ${runOrder.length} scored run${runOrder.length === 1 ? "" : "s"}, latest ${new Date(latestRun.createdAt).toLocaleString()}`
               : runsPending
                 ? "Loading your runs…"
                 : runsError

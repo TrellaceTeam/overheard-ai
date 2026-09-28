@@ -225,9 +225,8 @@ describe("reads", () => {
   });
 
   it("marks the perception run so a dashboard can leave it out of its run count", () => {
-    // One press of Run now creates two rows. Counted naively the header says
-    // "Aggregate of 2 completed runs" directly above a trend panel saying
-    // "One run scored so far".
+    // One press of Run now creates two rows. Counted naively, the dashboard
+    // treats one finished run as two.
     const db = open();
     createRun(db, "p1");
     const runs = listRuns(db, "p1");
