@@ -1,0 +1,555 @@
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+/* Inter, vendored through npm. No runtime font CDN: a remote font request from
+   a local-first app is a privacy leak and it breaks offline. */
+@import "@fontsource-variable/inter";
+@source "../src";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Overheard AI - the "Midnight" design system.
+ *
+ * Dark only, near-black void surfaces, forest green primary, hairline borders
+ * instead of shadows, Inter throughout with tabular figures. Values are HSL
+ * triplets so they compose with hsl(var(--x) / alpha).
+ *
+ * Never hardcode colors in components; use these tokens.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Raw scale */
+  --void: 210 11% 3.5%;
+  --carbon: 210 6% 6%;
+  --obsidian: 210 4% 9%;
+  --graphite: 223 9% 15%;
+  --smoke: 214 6% 23%;
+  --ash: 218 5% 41%;
+  --fog: 219 6% 57%;
+  --mist: 218 20% 85%;
+  --bone: 240 2% 90%;
+  --paper: 0 0% 100%;
+  --forest-green: 134 59% 33%;
+  --pulse-green: 134 62% 40%;
+  --coral-red: 0 79% 63%;
+  --signal-teal: 186 98% 40%;
+  --iris-violet: 239 84% 67%;
+  --lavender: 258 90% 66%;
+  --amber: 46 67% 47%;
+
+  /* Semantic */
+  --background: hsl(var(--void));
+  --foreground: hsl(var(--paper));
+  --surface: hsl(var(--carbon));
+  --surface-raised: hsl(var(--obsidian));
+  --card: hsl(var(--carbon));
+  --card-foreground: hsl(var(--mist));
+  --popover: hsl(var(--obsidian));
+  --popover-foreground: hsl(var(--mist));
+  /* Pulse green rather than forest for --primary: the app uses text-primary on
+     the void background in ~50 places, and forest at 33% lightness fails
+     contrast there. Forest stays as the ring. */
+  --primary: hsl(var(--pulse-green));
+  /* Void on pulse green measures 6.22:1 at button text sizes; paper measures
+     only 3.21:1, under the 4.5:1 body-text floor for every default button,
+     badge and selected chip. The hover washes on those fills are part of the
+     pair: at 90% the wash still holds void text at 5.20:1, while an 80% wash
+     would drop it to 4.30:1. */
+  --primary-foreground: hsl(var(--void));
+  /* Same fill as --primary, so it takes the same foreground. */
+  --signal: hsl(var(--pulse-green));
+  --signal-foreground: hsl(var(--void));
+  --secondary: hsl(210 3% 14%);
+  --secondary-foreground: hsl(var(--mist));
+  --muted: hsl(240 2% 8%);
+  --muted-foreground: hsl(var(--fog));
+  --accent: hsl(210 2% 11%);
+  --accent-foreground: hsl(var(--paper));
+  --destructive: hsl(var(--coral-red));
+  /* Void on coral measures 5.69:1; paper measures only 3.50:1. Coral stays as
+     bright as it is because it doubles as failure text on the void, where the
+     same pair reads 5.69:1 the other way round. The 90% hover wash keeps void
+     text at 4.77:1; an 80% wash would drop it to 3.96:1. */
+  --destructive-foreground: hsl(var(--void));
+  --warn: hsl(var(--amber));
+  --positive: hsl(var(--pulse-green));
+
+  /*
+   * Run status. Six states, six values, and every one of them is rendered with
+   * its word beside it, so nothing here is colour alone.
+   *
+   * Queued and cancelled share the grey: both mean nothing is happening, and
+   * the label tells them apart. Running is cyan, not green, so a run in flight
+   * is never mistaken at a glance for one that finished.
+   *
+   * All six clear 4.5:1 on the void background, because they are used as text.
+   */
+  --status-queued: hsl(var(--fog));
+  --status-running: #22c3dd;
+  --status-complete: hsl(var(--pulse-green));
+  --status-partial: #d7a83a;
+  --status-failed: hsl(var(--coral-red));
+  --status-cancelled: hsl(var(--fog));
+  --border: hsl(var(--graphite));
+  --border-strong: hsl(var(--smoke));
+  /* The boundary token for interactive controls: inputs, the outline variant,
+     the unchecked switch track, unselected toggle chips, and the secondary
+     badge that marks a prompt Off. Ash is the first grey in the scale that
+     clears the 3:1 a control boundary needs: 3.52:1 on the void, 3.38:1 on a
+     card. Decorative panels keep the --border hairline. */
+  --input: hsl(var(--ash));
+  --ring: hsl(var(--forest-green));
+
+  /*
+   * Chart series. Five slots, assigned in this fixed order and never cycled:
+   * the project brand always takes slot 1, so a colour follows a brand rather
+   * than its position in a filtered list.
+   *
+   * The five sit inside the OKLCH lightness band a near-black plot needs
+   * (0.48-0.67), hold chroma, and stay apart for a reader with protanopia or
+   * deuteranopia: the worst neighbouring pair is dE 12.8, against a floor of 8.
+   *
+   * Slot 1 resolves to the same value as the product green (#27a544). The
+   * chart amber is darker than --warn, which carries text and so needs more
+   * contrast than a line does.
+   *
+   * A sixth series is not a sixth hue. seriesColor hands out --chart-other, a
+   * neutral, instead of reusing a slot and implying two brands are one.
+   */
+  --chart-1: hsl(var(--pulse-green));
+  --chart-2: #7970d5;
+  --chart-3: #b78b19;
+  --chart-4: #00a4c0;
+  --chart-5: #ee5377;
+  --chart-other: hsl(var(--ash));
+  --chart-grid: hsl(var(--graphite));
+
+  /*
+   * Tag palette. Six hues for the prompt library's tag chips, assigned by a
+   * stable hash of the tag name (lib/tag-colors), never by list position.
+   *
+   * Not the chart or status tokens: green is the brand and success, amber
+   * warns, coral fails, cyan runs, and chart slots 2-5 already mean specific
+   * competitors one tab away. These six sit between those reserved hues, at a
+   * lightness that clears 4.5:1 as text on the dark surfaces and 3:1 as a chip
+   * boundary on a card.
+   */
+  --tag-1: 210 62% 66%;
+  --tag-2: 272 58% 72%;
+  --tag-3: 312 55% 70%;
+  --tag-4: 340 62% 70%;
+  --tag-5: 88 45% 62%;
+  --tag-6: 166 48% 60%;
+
+  --sidebar: hsl(var(--carbon));
+  --sidebar-foreground: hsl(var(--mist));
+  --sidebar-primary: hsl(var(--forest-green));
+  --sidebar-primary-foreground: hsl(var(--paper));
+  --sidebar-accent: hsl(210 2% 11%);
+  --sidebar-accent-foreground: hsl(var(--paper));
+  --sidebar-border: hsl(var(--graphite));
+  --sidebar-ring: hsl(var(--forest-green));
+
+  /* Hairline borders replace shadows */
+  --shadow-hairline: inset 0 0 0 1px hsl(var(--border));
+  --shadow-accent: 0 1px 2px hsl(var(--void) / 0.6), 0 4px 12px hsl(var(--forest-green) / 0.12);
+
+  /* Motion */
+  --duration-fast: 100ms;
+  --duration-base: 150ms;
+  --duration-slow: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --font-sans-stack: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+
+  /*
+   * Spacing rhythm. Everything on a screen picks one of these, so the gap
+   * between two cards and the gap between two sections are never accidentally
+   * the same number arrived at twice.
+   */
+  --space-tight: 0.5rem;
+  --space-card: 0.75rem;
+  --space-block: 1.25rem;
+  --space-section: 2.25rem;
+  --pad-panel: 1.25rem;
+  --pad-panel-dense: 0.75rem;
+}
+
+/*
+ * Dark class kept as an alias of :root. This system is dark only, so a .dark
+ * wrapper must not shift any value.
+ */
+.dark {
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: var(--font-sans-stack);
+  --font-display: var(--font-sans-stack);
+  --font-mono: var(--font-sans-stack);
+
+  /* Only three radii, plus a micro radius for glyph controls. */
+  --radius: 12px;
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-2xl: 12px;
+  --radius-3xl: 12px;
+  --radius-4xl: 12px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-other: var(--chart-other);
+  --color-status-queued: var(--status-queued);
+  --color-status-running: var(--status-running);
+  --color-status-complete: var(--status-complete);
+  --color-status-partial: var(--status-partial);
+  --color-status-failed: var(--status-failed);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-warn: var(--warn);
+  --color-positive: var(--positive);
+
+  /* Raw scale, for the few places that need a step the semantic names miss. */
+  --color-paper: hsl(var(--paper));
+  --color-bone: hsl(var(--bone));
+  --color-mist: hsl(var(--mist));
+  --color-fog: hsl(var(--fog));
+  --color-ash: hsl(var(--ash));
+  --color-smoke: hsl(var(--smoke));
+  --color-graphite: hsl(var(--graphite));
+  --color-obsidian: hsl(var(--obsidian));
+  --color-carbon: hsl(var(--carbon));
+  --color-void: hsl(var(--void));
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    /* cv01/ss03 are the Inter alternates the system specifies; zero slashes the
+       zero so metric readouts stay unambiguous without a mono face. */
+    font-feature-settings:
+      "cv01" 1,
+      "ss03" 1,
+      "zero" 1;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 590;
+    letter-spacing: -0.012em;
+  }
+
+  h1 {
+    letter-spacing: -0.022em;
+  }
+
+  ::selection {
+    /* A lighter alpha, such as 0.25, is imperceptible on the near-black surfaces. */
+    background: hsl(var(--pulse-green) / 0.45);
+    color: hsl(var(--paper));
+  }
+
+  /*
+   * One focus system. Anything focusable that does not carry its own ring
+   * shows this: the ring colour at 2 px with a 2 px offset, in the keyboard
+   * modality only. The primitives that keep a ring match the 2 px width, so
+   * every stop on a keyboard walk reads the same.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /*
+   * A run finishing, a panel opening and a chart drawing itself are the only
+   * motion in the app, and none of them is worth making somebody unwell.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * The type scale. Six steps, one family, and no screen invents a seventh.
+ *
+ * Each step carries the size, the weight, the tracking and the colour
+ * together, because a heading's colour is as much a rank signal as its size,
+ * and the same rank of heading must render the same in every file.
+ *
+ * Nothing here is uppercase. Every label is written in sentence case in its
+ * own source file and shown that way.
+ */
+@utility type-display {
+  font-size: 1.875rem;
+  line-height: 1.08;
+  letter-spacing: -0.024em;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+@utility type-title {
+  font-size: 1.375rem;
+  line-height: 1.2;
+  letter-spacing: -0.018em;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+/* Section headings. Sentence case, foreground, one step above body. */
+@utility type-section {
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  letter-spacing: -0.008em;
+  font-weight: 590;
+  color: var(--color-foreground);
+}
+
+/* The small name above a number or a field group. */
+@utility type-label {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+}
+
+/* Supporting prose: hints, scope lines, timestamps. */
+@utility type-meta {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-muted-foreground);
+}
+
+/*
+ * The loudest thing in the system. A rate is the whole product, so it is set
+ * large, tight and tabular, and nothing else on a screen uses this size.
+ */
+@utility type-metric {
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.028em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings:
+    "cv01" 1,
+    "ss03" 1,
+    "zero" 1;
+}
+
+/*
+ * The numeral treatment for metric readouts across the app: Inter with
+ * tabular figures, in the same face as the text around it.
+ */
+@utility num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings:
+    "cv01" 1,
+    "ss03" 1,
+    "zero" 1;
+  letter-spacing: -0.011em;
+}
+
+@utility panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card, 12px);
+}
+
+@utility panel-raised {
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/*
+ * The tag chip. One class, coloured entirely by tokens: the palette slot rides
+ * on data-tag-color (1-6; 0 or absent is the neutral untagged chip, which
+ * wears the control-boundary grey). The tag's name is always the chip's text,
+ * so colour helps the eye group but never carries the identity alone. The
+ * boundary at 80% of the full hue holds 3:1 against a card; the text in the
+ * full hue holds 4.5:1 against the light tint. Labels never wrap to a second
+ * line.
+ *
+ * These rules are unlayered: the chip trigger is a Radix SelectTrigger, and
+ * unlayered CSS outranks the boxed defaults in Tailwind's utilities layer
+ * without a single !important. The cost is that utility classes cannot
+ * override what is set here, so sizing lives in the modifier below, not in
+ * class lists.
+ *
+ * A static chip shows its tag in full. A capped chip (.tag-chip-capped, the
+ * picker trigger on a card) truncates with an ellipsis instead, and its full
+ * text is one keystroke away: opening the picker lists every tag untruncated.
+ */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  min-width: 0;
+  padding: 0 0.5rem;
+  border: 1px solid hsl(var(--ash));
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--fog));
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tag-chip-capped {
+  max-width: 11rem;
+}
+
+.tag-chip-capped > .tag-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* One shared dressing, six one-line slot assignments: the palette size lives
+   in lib/tag-colors (TAG_COLOR_COUNT) and these two places must agree. */
+.tag-chip[data-tag-color]:not([data-tag-color="0"]) {
+  color: hsl(var(--tag));
+  border-color: hsl(var(--tag) / 0.8);
+  background: hsl(var(--tag) / 0.12);
+}
+.tag-chip[data-tag-color="1"] {
+  --tag: var(--tag-1);
+}
+.tag-chip[data-tag-color="2"] {
+  --tag: var(--tag-2);
+}
+.tag-chip[data-tag-color="3"] {
+  --tag: var(--tag-3);
+}
+.tag-chip[data-tag-color="4"] {
+  --tag: var(--tag-4);
+}
+.tag-chip[data-tag-color="5"] {
+  --tag: var(--tag-5);
+}
+.tag-chip[data-tag-color="6"] {
+  --tag: var(--tag-6);
+}
+
+/*
+ * The rail under a rate.
+ *
+ * A percentage is a part of a hundred and the number alone does not show that,
+ * so every headline rate carries three pixels of its own denominator. It reads
+ * at a glance from across a desk, which a two digit number does not, and it
+ * costs no library and no layout. The fill takes currentColor, so the tone
+ * class on the number is the tone of its rail.
+ */
+@utility meter {
+  height: 3px;
+  border-radius: 999px;
+  background-color: color-mix(in oklab, var(--color-border) 80%, transparent);
+  overflow: hidden;
+}
+
+@utility meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background-color: currentColor;
+}
+
+/*
+ * A textarea the height of what is in it.
+ *
+ * The starter questions are one line each, and a fixed two-row box would leave
+ * an empty line under every question on the wizard's second step. Browsers
+ * without field-sizing fall back to the rows attribute.
+ */
+@utility autosize {
+  field-sizing: content;
+}
+
+/* The vertical rhythm for a page made of sections. */
+@utility stack-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-section);
+}
+
+@utility stack-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-block);
+}
+
+@utility grid-backdrop {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--color-border) 55%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--color-border) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 64px 64px;
+}

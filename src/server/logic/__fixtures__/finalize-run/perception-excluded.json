@@ -1,0 +1,300 @@
+{
+  "name": "perception-excluded",
+  "description": "A done perception task is excluded from the tasks CTE, so answers stays 2 rather than 3. It is also excluded from done, mid, failed and blocked in update_run_progress, but not from pending, so a run whose perception task is still extracting stays running and finalize_run stays reachable. Inserting an observation against a perception task raises.",
+  "source": "scripts/finalize-run-oracle/sql/functions.sql, run in PGlite",
+  "input": {
+    "projects": [
+      {
+        "id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "name": "Overheard AI Demo Project"
+      }
+    ],
+    "models": [
+      {
+        "id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "provider": "example",
+        "model_key": "assistant-alpha",
+        "label": "Assistant Alpha",
+        "tier": "frontier"
+      },
+      {
+        "id": "bbbbbbbb-0000-4000-8000-000000000002",
+        "provider": "example",
+        "model_key": "assistant-beta",
+        "label": "Assistant Beta",
+        "tier": "mid"
+      }
+    ],
+    "prompts": [
+      {
+        "id": "cccccccc-0000-4000-8000-000000000001",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "text": "best analytics tools for a small team",
+        "category": "discovery",
+        "iterations": 3
+      },
+      {
+        "id": "cccccccc-0000-4000-8000-000000000002",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "text": "top search platforms",
+        "category": "discovery",
+        "iterations": 2
+      }
+    ],
+    "brands": [
+      {
+        "id": "dddddddd-0000-4000-8000-000000000001",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "name": "Acme Analytics",
+        "role": "target"
+      },
+      {
+        "id": "dddddddd-0000-4000-8000-000000000002",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "name": "Northwind Metrics",
+        "role": "competitor"
+      },
+      {
+        "id": "dddddddd-0000-4000-8000-000000000003",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "name": "Contoso Insights",
+        "role": "competitor"
+      },
+      {
+        "id": "dddddddd-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "name": "Fabrikam Labs",
+        "role": "competitor"
+      },
+      {
+        "id": "dddddddd-0000-4000-8000-000000000005",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "name": "Globex Search",
+        "role": "discovered"
+      }
+    ],
+    "runs": [
+      {
+        "id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "trigger": "manual",
+        "status": "running",
+        "planned_calls": 4,
+        "completed_calls": 0,
+        "failed_calls": 0,
+        "config_snapshot": "{\"note\":\"synthetic fixture\"}"
+      }
+    ],
+    "run_tasks": [
+      {
+        "id": "ffffffff-0000-4000-8000-000000000001",
+        "run_id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "prompt_id": "cccccccc-0000-4000-8000-000000000001",
+        "model_id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "iteration": 1,
+        "question_text": "best analytics tools for a small team",
+        "is_perception": false,
+        "status": "done",
+        "attempts": 1,
+        "answer_text": "synthetic answer text",
+        "error": null
+      },
+      {
+        "id": "ffffffff-0000-4000-8000-000000000002",
+        "run_id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "prompt_id": "cccccccc-0000-4000-8000-000000000001",
+        "model_id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "iteration": 2,
+        "question_text": "best analytics tools for a small team",
+        "is_perception": false,
+        "status": "done",
+        "attempts": 1,
+        "answer_text": "synthetic answer text",
+        "error": null
+      },
+      {
+        "id": "ffffffff-0000-4000-8000-000000000003",
+        "run_id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "prompt_id": null,
+        "model_id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "iteration": 1,
+        "question_text": "What do you know about Acme Analytics?",
+        "is_perception": true,
+        "status": "done",
+        "attempts": 1,
+        "answer_text": "synthetic answer text",
+        "error": null
+      }
+    ],
+    "brand_observations": [
+      {
+        "id": "11111111-0000-4000-8000-000000000001",
+        "run_task_id": "ffffffff-0000-4000-8000-000000000001",
+        "run_id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "brand_id": "dddddddd-0000-4000-8000-000000000001",
+        "raw_name": "Acme Analytics",
+        "position": 1,
+        "total_items": null,
+        "mention_type": "ranked",
+        "linked_url": null,
+        "is_cited": false,
+        "evidence": null
+      },
+      {
+        "id": "11111111-0000-4000-8000-000000000002",
+        "run_task_id": "ffffffff-0000-4000-8000-000000000002",
+        "run_id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "brand_id": "dddddddd-0000-4000-8000-000000000001",
+        "raw_name": "Acme Analytics",
+        "position": 1,
+        "total_items": null,
+        "mention_type": "ranked",
+        "linked_url": null,
+        "is_cited": false,
+        "evidence": null
+      },
+      {
+        "id": "11111111-0000-4000-8000-000000000003",
+        "run_task_id": "ffffffff-0000-4000-8000-000000000002",
+        "run_id": "eeeeeeee-0000-4000-8000-000000000004",
+        "project_id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "brand_id": "dddddddd-0000-4000-8000-000000000002",
+        "raw_name": "Northwind Metrics",
+        "position": 2,
+        "total_items": null,
+        "mention_type": "ranked",
+        "linked_url": null,
+        "is_cited": false,
+        "evidence": null
+      }
+    ]
+  },
+  "expected": {
+    "run": {
+      "status": "completed",
+      "planned_calls": 4,
+      "completed_calls": 4,
+      "failed_calls": 0,
+      "started_at_set": true,
+      "finished_at_set": true
+    },
+    "run_metrics_row_count": 4,
+    "second_finalize_identical": true,
+    "run_metrics": [
+      {
+        "scope": "model+prompt (lvl 0)",
+        "model_label": "assistant-alpha",
+        "prompt_label": "best analytics tools for a small team",
+        "brand_name": "Acme Analytics",
+        "model_id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "prompt_id": "cccccccc-0000-4000-8000-000000000001",
+        "brand_id": "dddddddd-0000-4000-8000-000000000001",
+        "answers": 2,
+        "mentions": 2,
+        "ranked": 2,
+        "citations": 0,
+        "mention_rate": "1.0000",
+        "rank_rate": "1.0000",
+        "citation_rate": "0.0000",
+        "link_when_mentioned": "0.0000",
+        "avg_rank": "1.00",
+        "best_rank": 1,
+        "worst_rank": 1,
+        "rank_stddev": "0.00",
+        "share_of_voice": "0.6667",
+        "top_pick_share": "1.0000",
+        "top3_rate": "1.0000"
+      },
+      {
+        "scope": "model+prompt (lvl 0)",
+        "model_label": "assistant-alpha",
+        "prompt_label": "best analytics tools for a small team",
+        "brand_name": "Northwind Metrics",
+        "model_id": "bbbbbbbb-0000-4000-8000-000000000001",
+        "prompt_id": "cccccccc-0000-4000-8000-000000000001",
+        "brand_id": "dddddddd-0000-4000-8000-000000000002",
+        "answers": 2,
+        "mentions": 1,
+        "ranked": 1,
+        "citations": 0,
+        "mention_rate": "0.5000",
+        "rank_rate": "0.5000",
+        "citation_rate": "0.0000",
+        "link_when_mentioned": "0.0000",
+        "avg_rank": "2.00",
+        "best_rank": 2,
+        "worst_rank": 2,
+        "rank_stddev": "0.00",
+        "share_of_voice": "0.3333",
+        "top_pick_share": "0.0000",
+        "top3_rate": "0.5000"
+      },
+      {
+        "scope": "run (lvl 1)",
+        "model_label": "(all assistants)",
+        "prompt_label": "(all prompts)",
+        "brand_name": "Acme Analytics",
+        "model_id": null,
+        "prompt_id": null,
+        "brand_id": "dddddddd-0000-4000-8000-000000000001",
+        "answers": 2,
+        "mentions": 2,
+        "ranked": 2,
+        "citations": 0,
+        "mention_rate": "1.0000",
+        "rank_rate": "1.0000",
+        "citation_rate": "0.0000",
+        "link_when_mentioned": "0.0000",
+        "avg_rank": "1.00",
+        "best_rank": 1,
+        "worst_rank": 1,
+        "rank_stddev": "0.00",
+        "share_of_voice": "0.6667",
+        "top_pick_share": "1.0000",
+        "top3_rate": "1.0000"
+      },
+      {
+        "scope": "run (lvl 1)",
+        "model_label": "(all assistants)",
+        "prompt_label": "(all prompts)",
+        "brand_name": "Northwind Metrics",
+        "model_id": null,
+        "prompt_id": null,
+        "brand_id": "dddddddd-0000-4000-8000-000000000002",
+        "answers": 2,
+        "mentions": 1,
+        "ranked": 1,
+        "citations": 0,
+        "mention_rate": "0.5000",
+        "rank_rate": "0.5000",
+        "citation_rate": "0.0000",
+        "link_when_mentioned": "0.0000",
+        "avg_rank": "2.00",
+        "best_rank": 2,
+        "worst_rank": 2,
+        "rank_stddev": "0.00",
+        "share_of_voice": "0.3333",
+        "top_pick_share": "0.0000",
+        "top3_rate": "0.5000"
+      }
+    ],
+    "perception_observation_insert_raises": true,
+    "perception_observation_error_prefix": "PERCEPTION_HAS_NO_OBSERVATIONS: a ",
+    "while_perception_still_extracting": {
+      "run": {
+        "status": "running",
+        "planned_calls": 4,
+        "completed_calls": 4,
+        "failed_calls": 0,
+        "started_at_set": true,
+        "finished_at_set": false
+      },
+      "run_metrics_row_count": 4
+    }
+  }
+}

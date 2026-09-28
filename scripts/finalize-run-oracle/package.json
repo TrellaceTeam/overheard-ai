@@ -1,0 +1,13 @@
+{
+  "name": "overheard-finalize-run-oracle",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Embedded Postgres oracle that generates the finalize_run parity fixtures. Its own dependency tree; not part of the app build.",
+  "scripts": {
+    "oracle": "node oracle.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

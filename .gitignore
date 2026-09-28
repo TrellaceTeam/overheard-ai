@@ -1,0 +1,24 @@
+node_modules/
+.output/
+.nitro/
+.tanstack/
+dist/
+
+.env
+.env.*
+!.env.example
+
+data/
+*.db
+*.db-wal
+*.db-shm
+
+*.local
+.DS_Store
+
+# The oracle has its own dependency tree and its own lockfile.
+scripts/finalize-run-oracle/node_modules/
+scripts/finalize-run-oracle/out/
+
+# Working screenshots. The README's images live in docs/screenshots/.
+.shots/
