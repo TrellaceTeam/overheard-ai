@@ -57,7 +57,7 @@ tables:
 | `prompts` | The buyer questions, with a `category` that is the tag (the server requires one whenever it creates or retags a question; the column itself is nullable), an `iterations` count, an on/off flag and an archived flag. A run asks a prompt only when it is on and not archived. |
 | `project_models` | Which assistants a project asks. |
 | `runs` | One measurement. Status, planned, completed and failed call counts, a config snapshot, whether it was a mock run, and when it was scored. |
-| `run_tasks` | One row per answer, and the answer text itself. |
+| `run_tasks` | One row per answer, and the answer text itself. `model_id` is the catalogue model asked, and `answer_model` is the version the provider said answered, which can be a dated snapshot behind that id. |
 | `extractions` | The structured read of one answer, with the raw JSON kept. |
 | `brand_observations` | One row per brand named in one answer: position, mention type, citation and evidence. |
 | `run_metrics` | The scored output of a run, at two scope levels. |

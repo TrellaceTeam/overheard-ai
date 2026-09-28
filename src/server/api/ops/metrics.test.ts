@@ -329,3 +329,23 @@ describe("self-referenced prompts", () => {
     expect(promptAnswerCounts(db, "p1")["q-self"]).toBe(1);
   });
 });
+
+describe("the assistants each run asked", () => {
+  it("comes from the tasks, so an assistant whose answers named no brand still counts", () => {
+    const db = open();
+    const task = db.prepare(
+      `INSERT INTO run_tasks (id, run_id, project_id, prompt_id, model_id, iteration, is_perception, status)
+       VALUES (?, ?, 'p1', ?, ?, 1, ?, 'done')`,
+    );
+    task.run("t1", "r1", "q1", HAIKU, 0);
+    // Sonnet answered in r1 but named no brand, so r1 has no metric row for it.
+    task.run("t2", "r1", "q1", SONNET, 0);
+    task.run("t3", "r2", "q1", SONNET, 0);
+    // The perception question is not a measured assistant.
+    task.run("t4", "r2", null, HAIKU, 1);
+
+    const { runModels } = projectMetricWindow(db, "p1");
+    expect(runModels["r1"]?.slice().sort()).toEqual([HAIKU, SONNET].sort());
+    expect(runModels["r2"]).toEqual([SONNET]);
+  });
+});

@@ -252,7 +252,10 @@ describe("the pass", () => {
 
 describe("the answer phase", () => {
   it("persists the answer, logs the call and refreshes the run", async () => {
-    (callProvider as Mock).mockResolvedValue(providerResult("Acme Analytics leads on coverage."));
+    (callProvider as Mock).mockResolvedValue({
+      ...providerResult("Acme Analytics leads on coverage."),
+      model: "answerer-2026-09-22",
+    });
     claimOnce([claimed()]);
 
     await runWorkerPass(db);
@@ -262,6 +265,8 @@ describe("the answer phase", () => {
       answerTokens: 300,
       latencyMs: expect.any(Number),
       providerCostUsd: expect.any(Number),
+      // The version the provider reported, stored beside the catalogue model.
+      answerModel: "answerer-2026-09-22",
     });
     expect(recordUsageEvent).toHaveBeenCalledWith(
       db,

@@ -35,6 +35,7 @@ const SHIPPED = [
   "0009_run_task_failure_code",
   "0010_inflight_caps_setting",
   "0011_project_description",
+  "0012_answer_model",
 ];
 
 describe("migrate", () => {
@@ -158,6 +159,7 @@ describe("migrate", () => {
       "0009_run_task_failure_code",
       "0010_inflight_caps_setting",
       "0011_project_description",
+      "0012_answer_model",
     ]);
 
     const count = (sql: string) => handle.prepare(sql).get<{ c: number }>()!.c;
@@ -207,6 +209,7 @@ describe("migrate", () => {
       "0009_run_task_failure_code",
       "0010_inflight_caps_setting",
       "0011_project_description",
+      "0012_answer_model",
     ]);
 
     const rows = () =>
@@ -234,7 +237,11 @@ describe("migrate", () => {
     migrate(handle, builtInMigrations().slice(0, 9));
     handle.prepare("UPDATE app_state SET max_planned_calls = 250 WHERE id = 1").run();
 
-    expect(migrate(handle)).toEqual(["0010_inflight_caps_setting", "0011_project_description"]);
+    expect(migrate(handle)).toEqual([
+      "0010_inflight_caps_setting",
+      "0011_project_description",
+      "0012_answer_model",
+    ]);
 
     const row = handle
       .prepare(
@@ -268,7 +275,11 @@ describe("migrate", () => {
     // The kind is refused before the migration.
     expect(() => usage.run("u0", null, "prompt_generation", 0.001)).toThrow();
 
-    expect(migrate(handle)).toEqual(["0010_inflight_caps_setting", "0011_project_description"]);
+    expect(migrate(handle)).toEqual([
+      "0010_inflight_caps_setting",
+      "0011_project_description",
+      "0012_answer_model",
+    ]);
 
     const rows = handle
       .prepare("SELECT id, run_id, kind, cost_usd FROM usage_events ORDER BY id")

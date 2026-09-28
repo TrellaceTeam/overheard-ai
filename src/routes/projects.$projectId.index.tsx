@@ -55,6 +55,7 @@ import { hiddenDiscoveredSentence, selectVisibleCompetitors } from "@/lib/compet
 import { useTrackBrand } from "@/components/useTrackBrand";
 import { dominantFailure } from "@/lib/failure-reasons";
 import type { StoredFailure } from "@/lib/failure-codes";
+import { assistantChangeLine, assistantChanges } from "@/lib/assistant-changes";
 import { aggregateBrand, groupBy, type MetricRow } from "@/lib/metrics";
 import { runOutcome } from "@/lib/run-outcome";
 import { toAnswers } from "@/lib/run-progress";
@@ -63,7 +64,7 @@ import { topCandidate } from "@/lib/top-competitor";
 import { listBrands } from "@/server/api/brands";
 import { callLimit as fetchCallLimit } from "@/server/api/settings";
 import { projectMetricWindow } from "@/server/api/metrics";
-import { listProjectModels } from "@/server/api/models";
+import { listModels, listProjectModels } from "@/server/api/models";
 import { getPerceptionState } from "@/server/api/perception";
 import { listPrompts } from "@/server/api/prompts";
 import {
@@ -448,6 +449,44 @@ function Dashboard() {
 
   const byRun = useMemo(() => groupBy(filtered, (row) => row.run_id), [filtered]);
 
+  // Every assistant the catalogue knows, so a change can name one the project
+  // no longer asks.
+  const { data: catalogueModels } = useQuery({ queryKey: ["models"], queryFn: () => listModels() });
+
+  /**
+   * Where the assistants asked changed inside the trend's scope. Only providers
+   * the filter keeps count, so a change to a hidden assistant says nothing here.
+   */
+  const changeLines = useMemo(() => {
+    const names = new Map<string, string>();
+    const providers = new Map<string, string>();
+    for (const model of catalogueModels ?? []) {
+      names.set(model.id, model.display_name);
+      providers.set(model.id, model.provider);
+    }
+    for (const [id, name] of nameByModel) names.set(id, name);
+    for (const [id, provider] of providerByModel) providers.set(id, provider);
+    const inScope = (id: string) =>
+      filter.assistants === null || filter.assistants.includes(providers.get(id) ?? "");
+    const scoped: Record<string, string[]> = {};
+    for (const [runId, ids] of Object.entries(metricWindow?.runModels ?? {})) {
+      scoped[runId] = ids.filter(inScope);
+    }
+    return assistantChanges(runOrder, scoped)
+      .slice(-3)
+      .map((change) =>
+        assistantChangeLine(
+          change,
+          (id) => names.get(id) ?? "an assistant no longer offered",
+          new Date(change.at).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }),
+        ),
+      );
+  }, [catalogueModels, nameByModel, providerByModel, filter.assistants, metricWindow, runOrder]);
+
   // Day one usually holds several runs, and a date-only axis would repeat the
   // same tick once per run. See lib/trend-labels.ts.
   const runLabels = useMemo(
@@ -733,6 +772,13 @@ function Dashboard() {
           ]}
           empty={trendEmpty}
         />
+        {changeLines.length > 0 && (
+          <ul className="type-meta space-y-1">
+            {changeLines.map((line) => (
+              <li key={line}>{line} Points on either side compare different models.</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="space-y-3">

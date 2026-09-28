@@ -583,7 +583,10 @@ function RunDetail() {
                       {task.questionText ?? task.promptText ?? "Prompt not recorded"}
                     </span>
                     <span className="num type-meta block">
-                      {task.modelDisplayName ?? "Assistant"}, answer #{task.iteration}
+                      {task.modelDisplayName ?? "Assistant"}
+                      {/* The version the provider reported, which can be a dated
+                          snapshot behind the name. */}
+                      {task.answerModel ? ` (${task.answerModel})` : ""}, answer #{task.iteration}
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-3">

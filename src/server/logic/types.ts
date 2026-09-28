@@ -84,6 +84,8 @@ export interface AnswerResult {
   answerTokens: number | null;
   latencyMs: number | null;
   providerCostUsd: number | null;
+  /** The model version the provider says answered. Null when it reported none. */
+  answerModel?: string | null | undefined;
 }
 
 /** What the worker persists when extraction succeeds. */

@@ -454,6 +454,7 @@ async function answerPhase(db: Driver, claimed: ClaimedTask, ctx: PassContext): 
     answerTokens: result.tokens,
     latencyMs: Date.now() - started,
     providerCostUsd: costOf(model, result),
+    answerModel: result.model ?? null,
   });
 
   logUsage(db, task, model, "answer", result, "success");

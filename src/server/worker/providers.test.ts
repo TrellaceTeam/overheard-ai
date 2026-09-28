@@ -1248,6 +1248,67 @@ describe("enforcing the extraction shape", () => {
   });
 });
 
+describe("reading the model version the provider reports", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function reply(
+    provider: "openai" | "anthropic" | "google",
+    response: unknown,
+    webSearch = false,
+  ) {
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify(response), {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    return callProvider({
+      provider,
+      modelId: "asked-for",
+      apiKey: "test-key",
+      system: "system",
+      user: "user",
+      jsonMode: false,
+      webSearch,
+    });
+  }
+
+  it("OpenAI: the model field on both APIs", async () => {
+    const chat = await reply("openai", {
+      model: "reader-2026-09-22",
+      choices: [{ message: { content: "hi" } }],
+    });
+    expect(chat.model).toBe("reader-2026-09-22");
+    const responses = await reply("openai", { model: "answerer-2026-09-22", output: [] }, true);
+    expect(responses.model).toBe("answerer-2026-09-22");
+  });
+
+  it("Anthropic: the model field", async () => {
+    const res = await reply("anthropic", {
+      model: "answerer-5-5",
+      content: [{ type: "text", text: "hi" }],
+      stop_reason: "end_turn",
+      usage: {},
+    });
+    expect(res.model).toBe("answerer-5-5");
+  });
+
+  it("Gemini: modelVersion, and undefined when the reply names none", async () => {
+    const named = await reply("google", {
+      modelVersion: "answerer-flash-001",
+      candidates: [{ content: { parts: [{ text: "hi" }] } }],
+    });
+    expect(named.model).toBe("answerer-flash-001");
+    const unnamed = await reply("google", {
+      candidates: [{ content: { parts: [{ text: "hi" }] } }],
+    });
+    expect(unnamed.model).toBeUndefined();
+  });
+});
+
 describe("reporting a reply cut off at the output cap", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

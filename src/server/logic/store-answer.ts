@@ -36,6 +36,7 @@ export function storeAnswer(db: Driver, taskId: string, result: AnswerResult): v
             answer_tokens = ?,
             latency_ms = ?,
             provider_cost_usd = ?,
+            answer_model = ?,
             error = NULL,
             failure_code = NULL,
             locked_at = NULL,
@@ -48,6 +49,7 @@ export function storeAnswer(db: Driver, taskId: string, result: AnswerResult): v
     result.answerTokens,
     result.latencyMs,
     result.providerCostUsd,
+    result.answerModel ?? null,
     now,
     taskId,
   );

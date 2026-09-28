@@ -52,6 +52,12 @@ export type ProviderResult = {
    * "MAX_TOKENS".
    */
   truncated?: boolean | undefined;
+  /**
+   * The model version the provider says answered: OpenAI and Anthropic `model`,
+   * Gemini `modelVersion`. It can name a dated snapshot behind the id that was
+   * asked for. Undefined when the provider reports none.
+   */
+  model?: string | undefined;
 };
 
 /** The usage part of a result, which a rejected call is still billed for. */
@@ -460,6 +466,7 @@ function totalOf(input: number | null, output: number | null): number | null {
 }
 
 type ChatCompletion = {
+  model?: string;
   choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   usage?: {
     total_tokens?: number;
@@ -481,6 +488,7 @@ function fromChatCompletion(json: unknown, searchCalls = 0): ProviderResult {
     tokens: data.usage?.total_tokens ?? totalOf(inputTokens, outputTokens),
     searchCalls: data.usage?.num_search_queries ?? searchCalls,
     truncated: data.choices?.[0]?.finish_reason === "length",
+    model: data.model,
   };
 }
 
@@ -518,6 +526,7 @@ type ResponsesApi = {
     }>;
   }>;
   output_text?: string;
+  model?: string;
   status?: string;
   incomplete_details?: { reason?: string } | null;
   usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
@@ -564,6 +573,7 @@ function fromResponses(json: unknown): ProviderResult {
     ).length,
     truncated:
       data.status === "incomplete" && data.incomplete_details?.reason === "max_output_tokens",
+    model: data.model,
   };
 }
 
@@ -692,6 +702,7 @@ export async function callProvider({
           citations?: Array<{ type?: string; url?: string }>;
         }>;
         stop_reason?: string;
+        model?: string;
         usage?: {
           input_tokens?: number;
           output_tokens?: number;
@@ -705,6 +716,7 @@ export async function callProvider({
       let outputTokens = 0;
       let searchCalls = 0;
       let stopReason: string | undefined;
+      let reportedModel: string | undefined;
 
       // A server tool runs its own sampling loop. When that loop hits its
       // iteration limit, the turn returns stop_reason "pause_turn": HTTP 200,
@@ -782,6 +794,7 @@ export async function callProvider({
           if (toolUse && toolUse.input !== undefined) text += JSON.stringify(toolUse.input);
         }
         stopReason = json.stop_reason;
+        reportedModel = json.model ?? reportedModel;
 
         const searchFailure = webSearchFailure(json.content);
         if (searchFailure) {
@@ -811,6 +824,7 @@ export async function callProvider({
         searchCalls,
         stopReason,
         truncated: stopReason === "max_tokens",
+        model: reportedModel,
       };
     }
     case "google": {
@@ -848,6 +862,7 @@ export async function callProvider({
           promptTokenCount?: number;
           candidatesTokenCount?: number;
         };
+        modelVersion?: string;
       };
       const candidate = json.candidates?.[0];
       const text = withGroundingCitations(
@@ -863,6 +878,7 @@ export async function callProvider({
         tokens: json.usageMetadata?.totalTokenCount ?? totalOf(inputTokens, outputTokens),
         searchCalls: candidate?.groundingMetadata?.webSearchQueries?.length ?? 0,
         truncated: candidate?.finishReason === "MAX_TOKENS",
+        model: json.modelVersion,
       };
     }
   }

@@ -51,6 +51,12 @@ export interface MetricWindow {
   runsAvailable: number;
   /** True when runs produced by the mock provider mode were left out. */
   mockExcluded: boolean;
+  /**
+   * The assistants each run in the window asked, read from its tasks with the
+   * perception question left out. The rows cannot say this: an assistant whose
+   * answers named no brand in a run has no row for that run.
+   */
+  runModels: Record<string, string[]>;
 }
 
 /**
@@ -124,14 +130,28 @@ export function projectMetricWindow(
     budget -= run.rows;
   }
 
-  const window: Omit<MetricWindow, "rows"> = {
+  const window: Omit<MetricWindow, "rows" | "runModels"> = {
     capped: chosen.length < eligible.length,
     runsIncluded: chosen.length,
     runsAvailable: eligible.length,
     mockExcluded,
   };
 
-  if (chosen.length === 0) return { rows: [], ...window };
+  if (chosen.length === 0) return { rows: [], runModels: {}, ...window };
+
+  const runModels: Record<string, string[]> = {};
+  const asked = db
+    .prepare(
+      `SELECT DISTINCT run_id AS runId, model_id AS modelId FROM run_tasks
+        WHERE is_perception = 0 AND run_id IN (${chosen.map(() => "?").join(", ")})
+        ORDER BY run_id, model_id`,
+    )
+    .all<{ runId: string; modelId: string }>(...chosen);
+  for (const pair of asked) {
+    const models = runModels[pair.runId] ?? [];
+    models.push(pair.modelId);
+    runModels[pair.runId] = models;
+  }
 
   const rows = db
     .prepare(
@@ -141,7 +161,7 @@ export function projectMetricWindow(
     )
     .all<RunMetricRow>(...params, ...chosen);
 
-  return { rows, ...window };
+  return { rows, runModels, ...window };
 }
 
 /**

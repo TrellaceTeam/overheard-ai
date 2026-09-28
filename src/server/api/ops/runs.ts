@@ -84,6 +84,8 @@ export interface RunTaskView {
   promptText: string | null;
   modelId: string;
   modelDisplayName: string | null;
+  /** The model version the provider said answered, or null when none was reported. */
+  answerModel: string | null;
   createdAt: string;
   /** How many times this answer has been asked. >0 with status queued means a retry is pending. */
   attempts: number;
@@ -308,6 +310,7 @@ export function listRunTasks(db: Driver, runId: string): RunTaskView[] {
               t.question_text AS questionText, t.is_perception AS isPerception,
               t.prompt_id AS promptId, p.text AS promptText,
               t.model_id AS modelId, m.display_name AS modelDisplayName,
+              t.answer_model AS answerModel,
               t.created_at AS createdAt,
               t.attempts AS attempts, t.next_attempt_at AS nextAttemptAt
          FROM run_tasks t
@@ -395,6 +398,7 @@ export function listRunFailures(db: Driver, runId: string): RunTaskView[] {
               t.question_text AS questionText, t.is_perception AS isPerception,
               t.prompt_id AS promptId, p.text AS promptText,
               t.model_id AS modelId, m.display_name AS modelDisplayName,
+              t.answer_model AS answerModel,
               t.created_at AS createdAt,
               t.attempts AS attempts, t.next_attempt_at AS nextAttemptAt
          FROM run_tasks t

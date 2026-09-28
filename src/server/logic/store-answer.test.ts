@@ -96,6 +96,20 @@ describe("storeAnswer", () => {
 
     expect(claimTasks(db, 10, "worker-1")[0]?.phase).toBe("extracting");
   });
+
+  it("keeps the model version the provider reported, and null when it reported none", () => {
+    const answerModel = () =>
+      db
+        .prepare("SELECT answer_model FROM run_tasks WHERE id = ?")
+        .get<{ answer_model: string | null }>(TASK)?.answer_model;
+    const answer = { answerText: "an answer", answerTokens: 1, latencyMs: 1, providerCostUsd: 0 };
+
+    storeAnswer(db, TASK, { ...answer, answerModel: "reader-2026-09-22" });
+    expect(answerModel()).toBe("reader-2026-09-22");
+
+    storeAnswer(db, TASK, answer);
+    expect(answerModel()).toBeNull();
+  });
 });
 
 describe("storeExtraction", () => {
