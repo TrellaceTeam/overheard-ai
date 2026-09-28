@@ -11,8 +11,8 @@ it is dark, so there is no light version of these.
 | `00-banner.png` | `/projects/:id`, demo project | A 1144x447 crop of the dashboard's Visibility over time card: mention, top 3 and citation rates across the demo's 26 weekly runs. It names no company. |
 | `02-run.png` | `/projects/:id/runs/:runId`, demo project | The demo's newest weekly run, finished: all 36 answers collected, estimated spend on your own keys, and the Results tab with Ramp's rates in this run above the competitor table. |
 | `03-dashboard.png` | `/projects/:id`, demo project | The dashboard scrolled to its three rate cards, with the six-month trend and the head-to-head with Brex below them. |
-| `04-prompts.png` | `/projects/:id/prompts`, demo project | The Runner, locked because the demo is browse-only and no key is set, with its plan line and estimated cost, above the new prompt form. |
-| `05-competitors.png` | `/projects/:id/competitors`, demo project | Add a competitor, and the tracked competitor cards for Navan and Mercury with their rates, name variants and domains. |
+| `04-prompts.png` | `/projects/:id/prompts`, demo project | The Runner, locked because the demo is browse-only, with one assistant dropdown per provider and its plan line and estimated cost, above the new prompt form. |
+| `05-competitors.png` | `/projects/:id/competitors`, demo project | Add a competitor, and the tracked competitor cards for Brex and Navan with their rates, name variants and domains. |
 
 ## Real names
 

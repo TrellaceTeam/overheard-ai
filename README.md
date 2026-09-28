@@ -88,7 +88,7 @@ PL/pgSQL, run inside an embedded Postgres.
 | --- | --- |
 | ![Demo project dashboard: Ramp's mention, top 3 and citation rate cards, the six-month trend, and the head-to-head with Brex](docs/screenshots/03-dashboard.png) | ![The demo's newest weekly run, finished: all 36 answers collected, spend on your own keys at zero, Ramp's rates in this run, and the competitor table](docs/screenshots/02-run.png) |
 | **Competitors** | **Prompts and the Runner** |
-| ![Demo competitors: add a competitor, and the tracked cards for Navan and Mercury with their mention, top 3 and citation rates, name variants and domains](docs/screenshots/05-competitors.png) | ![Demo Prompts tab: the Runner, locked on the browse-only demo, with its plan line of 36 answers and 72 provider calls at an estimated cost, above the new prompt form](docs/screenshots/04-prompts.png) |
+| ![Demo competitors: add a competitor, and the tracked cards for Brex and Navan with their mention, top 3 and citation rates, name variants and domains](docs/screenshots/05-competitors.png) | ![Demo Prompts tab: the Runner, locked on the browse-only demo, with one assistant dropdown per provider and its plan line of 36 answers and 72 provider calls at an estimated cost, above the new prompt form](docs/screenshots/04-prompts.png) |
 
 The screenshots show the built-in demo project. Its history is generated, so none of it is a
 measurement of Ramp or its competitors.
