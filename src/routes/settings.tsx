@@ -9,12 +9,14 @@ import { DemoProjectSection } from "@/components/DemoProjectSection";
 import { InflightCapsSection } from "@/components/InflightCapsSection";
 import { KeyStatusList } from "@/components/KeyStatusList";
 import type { ProviderSlug } from "@/components/types";
+import { useModelAvailability } from "@/components/useModelAvailability";
 import { useProviderChecks } from "@/components/useProviderChecks";
 import { MockProvidersNotice } from "@/components/MockProvidersNotice";
 import { CALL_LIMIT_MAX, CALL_LIMIT_MIN } from "@/lib/call-limits";
 import { errorText } from "@/lib/error-text";
 import { providerLabel } from "@/lib/failure-reasons";
 import { demoState as fetchDemoState, restoreDemoProject } from "@/server/api/demo";
+import { listExtractionModels, listModels } from "@/server/api/models";
 import { setTutorial } from "@/server/api/tutorial";
 import {
   callLimit as fetchCallLimit,
@@ -157,9 +159,30 @@ function Settings() {
     void commitCallLimit(parsed);
   }
 
+  // Which catalogue models each key can use, named from the current catalogue.
+  const keyedProviders = (keys.data ?? [])
+    .filter((row) => row.configured)
+    .map((row) => String(row.provider));
+  const { availability: modelLists, refresh: refreshModelLists } =
+    useModelAvailability(keyedProviders);
+  const assistants = useQuery({ queryKey: ["models"], queryFn: () => listModels() });
+  const extractors = useQuery({
+    queryKey: ["extraction-models"],
+    queryFn: () => listExtractionModels(),
+  });
+  const currentModelNames = new Map(
+    [...(assistants.data ?? []), ...(extractors.data ?? [])]
+      .filter((model) => model.superseded !== 1)
+      .map((model) => [model.model_id, model.display_name] as const),
+  );
+
   // The check state lives in the hook. This route keeps the key query because
-  // the Provider keys section also renders its read error.
-  const { statuses, check } = useProviderChecks(keys.data, () => void keys.refetch());
+  // the Provider keys section also renders its read error. A check reads .env
+  // and the model lists again.
+  const { statuses, check } = useProviderChecks(keys.data, () => {
+    void keys.refetch();
+    void refreshModelLists();
+  });
 
   return (
     <main className="mx-auto max-w-3xl space-y-8 px-4 py-10">
@@ -184,6 +207,8 @@ function Settings() {
             statuses={statuses}
             onCheck={(provider) => void check(provider)}
             onRecheckKeys={() => void keys.refetch()}
+            availability={modelLists}
+            modelNames={currentModelNames}
           />
         )}
         <p className="text-xs text-muted-foreground">

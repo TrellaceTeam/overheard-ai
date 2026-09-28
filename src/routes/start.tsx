@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, Play, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AssistantPicker } from "@/components/AssistantPicker";
 import { AvailabilityNotice, NO_KEY_CONFIGURED } from "@/components/AvailabilityNotice";
 import { KeyStatusList } from "@/components/KeyStatusList";
 import { LockLine } from "@/components/LockLine";
@@ -11,14 +12,15 @@ import { PerceptionPromptCard } from "@/components/PerceptionPromptCard";
 import { RunPlanSummary } from "@/components/RunPlanSummary";
 import { TOUR_SELECTORS, useTour } from "@/components/TutorialTour";
 import { Button } from "@/components/ui/button";
+import { useModelAvailability } from "@/components/useModelAvailability";
 import { useProviderChecks } from "@/components/useProviderChecks";
 import { useSelectionCheck } from "@/components/useSelectionCheck";
 import { EMPTY_WIZARD_DRAFT, useWizardForm } from "@/components/useWizardForm";
-import { type CatalogModel, WizardAssistantPicker } from "@/components/WizardAssistantPicker";
 import { WizardBrandStep } from "@/components/WizardBrandStep";
 import { WizardPromptDoors } from "@/components/WizardPromptDoors";
 import { WizardPromptList } from "@/components/WizardPromptList";
 import { WizardSetupCheckPanel } from "@/components/WizardSetupCheckPanel";
+import { assistantMenus } from "@/lib/assistant-menu";
 import { resolveFeature } from "@/lib/availability";
 import { orderAssistants } from "@/lib/dashboard-filters";
 import { errorText } from "@/lib/error-text";
@@ -52,6 +54,8 @@ import {
 } from "@/server/api/settings";
 import { generateStarterPrompts } from "@/server/api/starter-prompts";
 import { setTutorial, tutorialState as fetchTutorialState } from "@/server/api/tutorial";
+
+type CatalogModel = Awaited<ReturnType<typeof listModels>>[number];
 
 /**
  * Project setup in two steps: the brand, then the questions and the assistants
@@ -213,16 +217,45 @@ function Start() {
     errorReason: "We could not check which provider keys are in your environment.",
   });
 
+  // Which catalogue models each key can use, from the providers' own lists.
+  const { availability: modelLists, refresh: refreshModelLists } =
+    useModelAvailability(keyedProviders);
+
   // One representative model per provider. The create gate below checks the
-  // exact models chosen instead.
-  const { statuses, check: checkProvider } = useProviderChecks(
-    keys.data,
-    () => void keys.refetch(),
+  // exact models chosen instead. A check reads .env and the model lists again.
+  const { statuses, check: checkProvider } = useProviderChecks(keys.data, () => {
+    void keys.refetch();
+    void refreshModelLists();
+  });
+
+  // The current catalogue's names, for the key panel's line of models per key.
+  const currentModelNames = useMemo(
+    () =>
+      new Map(
+        [...(models.data ?? []), ...(extractionModels.data ?? [])]
+          .filter((model) => model.superseded !== 1)
+          .map((model) => [model.model_id, model.display_name] as const),
+      ),
+    [models.data, extractionModels.data],
   );
 
+  // A model the key does not list is not preselected: every call to it would fail.
+  const missingModels = useMemo(
+    () =>
+      new Set(
+        Object.values(modelLists ?? {}).flatMap((report) =>
+          report?.status === "ok" ? report.missing : [],
+        ),
+      ),
+    [modelLists],
+  );
   const defaultModelIds = useMemo(
-    () => defaultAssistantIds(models.data ?? [], keyedProviders),
-    [models.data, keyedProviders],
+    () =>
+      defaultAssistantIds(
+        (models.data ?? []).filter((model) => !missingModels.has(model.model_id)),
+        keyedProviders,
+      ),
+    [models.data, keyedProviders, missingModels],
   );
   // A restored draft can name a model the catalogue no longer offers.
   const selectedModelIds = useMemo(() => {
@@ -244,6 +277,23 @@ function Start() {
       models: byProvider.get(provider) ?? [],
     }));
   }, [models.data]);
+
+  const menus = useMemo(
+    () =>
+      assistantMenus({
+        groups,
+        selectedIds: new Set(selectedModelIds),
+        // The tutorial shows every provider as asked: its demo calls none, and
+        // greying out providers with no key would teach the wrong lesson.
+        keyedProviders: new Set(
+          isTutorial ? groups.map((group) => group.provider) : keyedProviders,
+        ),
+        keysUnresolved: false,
+        locked: isTutorial,
+        availability: isTutorial ? undefined : modelLists,
+      }),
+    [groups, selectedModelIds, isTutorial, keyedProviders, modelLists],
+  );
 
   const { writtenPrompts } = form;
   const plan = newProjectPlan(writtenPrompts, selectedModelIds.length);
@@ -545,6 +595,8 @@ function Start() {
                   onRecheckKeys={() => void keys.refetch()}
                   showChecks={!isTutorial}
                   tourId={TOUR_SELECTORS.wizardKeys}
+                  availability={isTutorial ? undefined : modelLists}
+                  modelNames={currentModelNames}
                 />
                 {!isTutorial && (
                   <AvailabilityNotice
@@ -553,13 +605,10 @@ function Start() {
                   />
                 )}
                 {(availability.state === "on" || isTutorial) && (
-                  <WizardAssistantPicker
-                    groups={groups}
-                    keyedProviders={keyedProviders}
-                    selectedModelIds={selectedModelIds}
-                    onToggle={toggleModel}
-                    locked={isTutorial}
-                  />
+                  <fieldset disabled={isTutorial} className="block">
+                    {isTutorial && <LockLine />}
+                    <AssistantPicker menus={menus} locked={isTutorial} onToggle={toggleModel} />
+                  </fieldset>
                 )}
               </div>
 

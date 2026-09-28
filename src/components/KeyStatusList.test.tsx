@@ -94,6 +94,44 @@ describe("KeyStatusList", () => {
     expect(screen.queryByText("key found")).toBeNull();
   });
 
+  it("names the current models a key can use and the ones it cannot", () => {
+    render(
+      <KeyStatusList
+        statuses={statuses}
+        onCheck={() => {}}
+        availability={{
+          openai: {
+            status: "ok",
+            available: ["model-a", "model-old"],
+            missing: ["model-b"],
+          },
+        }}
+        modelNames={
+          new Map([
+            ["model-a", "Model A"],
+            ["model-b", "Model B"],
+          ])
+        }
+      />,
+    );
+    // The superseded model has no current name, so it stays off the line.
+    expect(
+      screen.getByText("Models on this key: Model A. Not on this key: Model B."),
+    ).toBeDefined();
+  });
+
+  it("says when a key's model list could not be read", () => {
+    render(
+      <KeyStatusList
+        statuses={statuses}
+        onCheck={() => {}}
+        availability={{ openai: { status: "error", message: "The list could not be read." } }}
+        modelNames={new Map()}
+      />,
+    );
+    expect(screen.getByText("The list could not be read.")).toBeDefined();
+  });
+
   it("carries the tour attribute and says keys never reach the browser", () => {
     const { container } = render(<KeyStatusList statuses={statuses} onCheck={() => {}} />);
     expect(container.querySelector('[data-tour="key-status"]')).not.toBeNull();

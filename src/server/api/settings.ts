@@ -26,6 +26,21 @@ export const keyStatus = createServerFn({ method: "GET" }).handler(async () => {
   return providerKeyStatus();
 });
 
+const availabilityInput = z.object({ force: z.boolean().optional() });
+
+/**
+ * Which catalogue models each key can use, from the providers' own model
+ * lists. The lists are free to read. `force` skips the few minutes they are
+ * cached, which is what the Check button asks for.
+ */
+export const modelAvailability = createServerFn({ method: "POST" })
+  .validator((data: unknown) => availabilityInput.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { getDb } = await import("../db/client");
+    const { modelAvailability: op } = await import("./ops/model-availability");
+    return op(getDb(), { force: data.force });
+  });
+
 /** Probe one provider's representative model with web search forced. */
 export const setupCheck = createServerFn({ method: "POST" })
   .validator((data: unknown) => providerInput.parse(data))

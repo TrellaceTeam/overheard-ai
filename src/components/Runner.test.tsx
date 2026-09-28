@@ -2,10 +2,10 @@
 /**
  * The Runner: the block at the top of the Prompts tab that decides and starts
  * the next run. The pure helpers pin the arithmetic the plan line promises.
- * The render tests pin the selector (chips, keyless providers, the held key
- * check) and the demo lock over all of it.
+ * The render tests pin the block around the assistant picker and the demo lock
+ * over all of it. The picker's own rules live in lib/assistant-menu.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -42,6 +42,8 @@ vi.mock("@/server/api/models", () => ({
   listModels: async () => [
     {
       id: "claude-mid",
+      model_id: "claude-mid",
+      superseded: 0,
       provider: "anthropic",
       display_name: "Claude Mid",
       tier: "mid",
@@ -51,6 +53,8 @@ vi.mock("@/server/api/models", () => ({
     },
     {
       id: "gpt-mid",
+      model_id: "gpt-mid",
+      superseded: 0,
       provider: "openai",
       display_name: "GPT Mid",
       tier: "mid",
@@ -60,6 +64,8 @@ vi.mock("@/server/api/models", () => ({
     },
     {
       id: "gemini-mid",
+      model_id: "gemini-mid",
+      superseded: 0,
       provider: "google",
       display_name: "Gemini Mid",
       tier: "mid",
@@ -107,10 +113,14 @@ vi.mock("@/server/api/settings", () => ({
     { provider: "google", configured: false, source: "none" },
   ],
   callLimit: async () => ({ limit: 1000 }),
+  modelAvailability: async () => ({
+    anthropic: { status: "ok", available: ["claude-mid"], missing: [] },
+    openai: { status: "ok", available: ["gpt-mid"], missing: [] },
+    google: { status: "no_key" },
+  }),
 }));
 
 import {
-  AssistantRows,
   Runner,
   groupModels,
   heldLine,
@@ -119,8 +129,16 @@ import {
   type RunnerPrompt,
 } from "./Runner";
 import { DEMO_READONLY_REASON } from "./DemoReadOnlyNote";
+import { installDomStubs } from "./test-helpers";
 
 afterEach(cleanup);
+
+beforeAll(installDomStubs);
+
+/** Radix opens a menu on a primary-button pointer press. */
+function openMenu(trigger: HTMLElement) {
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+}
 
 const PROMPTS: RunnerPrompt[] = [
   { id: "p1", is_active: 1, archived: 0, iterations: 5 },
@@ -151,6 +169,7 @@ describe("groupModels", () => {
   const model = (id: string, provider: string): RunnerModel => ({
     id,
     provider,
+    model_id: id,
     display_name: id,
     tier: "mid",
   });
@@ -211,134 +230,6 @@ describe("the held line", () => {
   });
 });
 
-/* ------------------------------------------------------------- selector rows */
-
-describe("AssistantRows", () => {
-  const groups = [
-    {
-      provider: "anthropic",
-      models: [{ id: "c1", provider: "anthropic", display_name: "Claude One", tier: "mid" }],
-    },
-    {
-      provider: "google",
-      models: [{ id: "g1", provider: "google", display_name: "Gemini One", tier: "mid" }],
-    },
-  ];
-
-  it("toggles a chip through the callback, marking the selected one pressed", () => {
-    const onToggle = vi.fn();
-    render(
-      createElement(AssistantRows, {
-        groups,
-        selectedIds: new Set(["c1"]),
-        keyedProviders: new Set(["anthropic", "google"]),
-        keysUnresolved: false,
-        keyCheckFailed: false,
-        locked: null,
-        onToggle,
-      }),
-    );
-    expect(screen.getByRole("button", { name: /Claude One/ }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Gemini One/ }));
-    expect(onToggle).toHaveBeenCalledWith("g1", true);
-    fireEvent.click(screen.getByRole("button", { name: /Claude One/ }));
-    expect(onToggle).toHaveBeenCalledWith("c1", false);
-  });
-
-  it("carries the tier in visible text on every chip", () => {
-    render(
-      createElement(AssistantRows, {
-        groups,
-        selectedIds: new Set(["c1"]),
-        keyedProviders: new Set(["anthropic", "google"]),
-        keysUnresolved: false,
-        keyCheckFailed: false,
-        locked: null,
-        onToggle: vi.fn(),
-      }),
-    );
-    expect(screen.getByRole("button", { name: "Claude One · mid" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Gemini One · mid" })).toBeTruthy();
-  });
-
-  it("is one greyed row with the reason for a provider with no key", () => {
-    render(
-      createElement(AssistantRows, {
-        groups,
-        selectedIds: new Set<string>(),
-        keyedProviders: new Set(["anthropic"]),
-        keysUnresolved: false,
-        keyCheckFailed: false,
-        locked: null,
-        onToggle: vi.fn(),
-      }),
-    );
-    expect(screen.queryByRole("button", { name: /Gemini One/ })).toBeNull();
-    expect(screen.getByText(/No Google key\. Add GOOGLE_API_KEY/)).toBeTruthy();
-  });
-
-  it("keeps a selected chip on a keyless row, so a model whose key disappeared can be switched off", () => {
-    const onToggle = vi.fn();
-    render(
-      createElement(AssistantRows, {
-        groups,
-        selectedIds: new Set(["g1"]),
-        keyedProviders: new Set(["anthropic"]),
-        keysUnresolved: false,
-        keyCheckFailed: false,
-        locked: null,
-        onToggle,
-      }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Gemini One/ }));
-    expect(onToggle).toHaveBeenCalledWith("g1", false);
-  });
-
-  it("holds unselected models while the key check is in flight, but lets selected ones off", () => {
-    render(
-      createElement(AssistantRows, {
-        groups,
-        selectedIds: new Set(["c1"]),
-        keyedProviders: new Set<string>(),
-        keysUnresolved: true,
-        keyCheckFailed: false,
-        locked: null,
-        onToggle: vi.fn(),
-      }),
-    );
-    expect((screen.getByRole("button", { name: /Gemini One/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByRole("button", { name: /Claude One/ }) as HTMLButtonElement).disabled).toBe(
-      false,
-    );
-    // The held state is a visible line, not a tooltip nobody can reach.
-    expect(screen.getByText(/Checking which provider keys are set/)).toBeTruthy();
-  });
-
-  it("disables everything when locked, with the demo reason", () => {
-    render(
-      createElement(AssistantRows, {
-        groups,
-        selectedIds: new Set(["c1"]),
-        keyedProviders: new Set(["anthropic", "google"]),
-        keysUnresolved: false,
-        keyCheckFailed: false,
-        locked: DEMO_READONLY_REASON,
-        onToggle: vi.fn(),
-      }),
-    );
-    expect((screen.getByRole("button", { name: /Claude One/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByRole("button", { name: /Gemini One/ }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-  });
-});
-
 /* ---------------------------------------------------------------- the block */
 
 describe("Runner", () => {
@@ -361,7 +252,7 @@ describe("Runner", () => {
       await screen.findByText(/2 assistants × 3 prompts × 5 iterations = 30 answers/),
     ).toBeTruthy();
     // Two selected assistants and a keyless provider row share the block.
-    expect(screen.getByRole("button", { name: "Claude Mid · mid" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Claude models: Claude Mid" })).toBeTruthy();
     expect(screen.getByText(/No Google key/)).toBeTruthy();
     // The estimate is the wizard's arithmetic (lib/run-estimate): two selected
     // assistants over 15 total iterations with the haiku extractor, at the
@@ -410,10 +301,11 @@ describe("Runner", () => {
   it("locks every control with the demo reason on the demo project", async () => {
     renderRunner(DEMO_READONLY_REASON);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Claude Mid · mid" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "Claude models: Claude Mid" })).toBeTruthy(),
     );
     expect(
-      (screen.getByRole("button", { name: "Claude Mid · mid" }) as HTMLButtonElement).disabled,
+      (screen.getByRole("button", { name: "Claude models: Claude Mid" }) as HTMLButtonElement)
+        .disabled,
     ).toBe(true);
     const run = screen.getByRole("button", { name: /Run now/ }) as HTMLButtonElement;
     expect(run.disabled).toBe(true);
@@ -423,7 +315,8 @@ describe("Runner", () => {
 
   it("saves an assistant toggle against the project", async () => {
     renderRunner();
-    fireEvent.click(await screen.findByRole("button", { name: "Claude Mid · mid" }));
+    openMenu(await screen.findByRole("button", { name: "Claude models: Claude Mid" }));
+    fireEvent.click(await screen.findByRole("menuitemcheckbox", { name: /Claude Mid/ }));
     await waitFor(() =>
       expect(runnerMocks.setProjectModel).toHaveBeenCalledWith({
         data: { projectId: "proj-1", modelId: "claude-mid", on: false },

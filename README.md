@@ -116,6 +116,9 @@ missing billing or an unavailable model shows up there with the reason and a fix
 are real and billed to your keys, but short. Gemini's free tier fails the check, because every
 answer has to search. `npm run check:search` runs the same probe from a terminal.
 
+Each key's model list is read from the provider too, for free. The key panel says which
+models your key can use, and the setup screen will not tick one it cannot.
+
 `.env.example` lists the other settings: the database path, the port, and how many calls each
 provider may have in flight.
 

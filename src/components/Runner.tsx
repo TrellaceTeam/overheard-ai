@@ -12,11 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AssistantPicker } from "@/components/AssistantPicker";
 import { RunPlanSummary, planWithEstimate } from "@/components/RunPlanSummary";
+import { useModelAvailability } from "@/components/useModelAvailability";
 import { useRunEstimate, countsTowardRun } from "@/components/useRunEstimate";
-import { assistantLabel, orderAssistants } from "@/lib/dashboard-filters";
-import { providerLabel } from "@/lib/failure-reasons";
-import { keyEnvNamesSafe } from "@/lib/provider-keys";
+import { assistantMenus } from "@/lib/assistant-menu";
+import { orderAssistants } from "@/lib/dashboard-filters";
 import { toAnswers } from "@/lib/run-progress";
 import { errorText } from "@/lib/error-text";
 import { money } from "@/lib/money";
@@ -24,12 +25,14 @@ import { listModels, listProjectModels, setProjectModel } from "@/server/api/mod
 import { createRun, kickWorker, planRun } from "@/server/api/runs";
 import { callLimit as fetchCallLimit, keyStatus as fetchKeyStatus } from "@/server/api/settings";
 
-/** A catalogue row the Runner needs: what a chip shows and what an estimate costs. */
+/** A catalogue row the Runner needs: what the picker shows and what an estimate costs. */
 export interface RunnerModel {
   id: string;
   provider: string;
+  model_id: string;
   display_name: string;
   tier: string;
+  superseded?: number;
   input_price_per_mtok?: number | string;
   output_price_per_mtok?: number | string;
   search_price_per_call?: number | string;
@@ -99,134 +102,6 @@ export function planLine(input: {
   return `${factors} = ${noun(answers, "answer", "answers")}`;
 }
 
-/**
- * The selector rows: one thin line per provider with its models as toggle
- * chips, each chip naming its tier in visible text. A provider with no key is
- * a single greyed row saying why. A model the project still monitors keeps its
- * chip on that row, because switching off a model whose key has gone must stay
- * possible. While the key check is in flight nothing unselected is offered,
- * and a visible line says the check is running, since no input can reach a
- * tooltip on a disabled button.
- */
-export function AssistantRows({
-  groups,
-  selectedIds,
-  keyedProviders,
-  keysUnresolved,
-  keyCheckFailed,
-  locked,
-  onToggle,
-}: {
-  groups: readonly RunnerModelGroup[];
-  selectedIds: ReadonlySet<string>;
-  keyedProviders: ReadonlySet<string>;
-  keysUnresolved: boolean;
-  keyCheckFailed: boolean;
-  /** The demo reason when nothing here may move, otherwise null. */
-  locked: string | null;
-  onToggle: (modelId: string, on: boolean) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      {groups.map((group) => {
-        const keyed = keyedProviders.has(group.provider);
-        const noKey = !keysUnresolved && !keyed;
-        const selectedModels = group.models.filter((model) => selectedIds.has(model.id));
-        const chipModels = noKey ? selectedModels : group.models;
-        return (
-          <div
-            key={group.provider}
-            className={`flex items-start gap-3 ${noKey ? "opacity-60" : ""}`}
-          >
-            <span className="type-label w-20 shrink-0 pt-1.5">
-              {assistantLabel(group.provider)}
-            </span>
-            {noKey ? (
-              <p className="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
-                {chipModels.map((model) => (
-                  <Chip
-                    key={model.id}
-                    model={model}
-                    selected
-                    disabled={locked !== null}
-                    onToggle={onToggle}
-                  />
-                ))}
-                <span>
-                  No {providerLabel(group.provider)} key. Add{" "}
-                  {keyEnvNamesSafe(group.provider) ?? "its API key"} to your .env file to ask it.
-                  There is no need to restart.
-                </span>
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {chipModels.map((model) => {
-                  const selected = selectedIds.has(model.id);
-                  const held = keysUnresolved && !selected;
-                  return (
-                    <Chip
-                      key={model.id}
-                      model={model}
-                      selected={selected}
-                      disabled={locked !== null || held}
-                      onToggle={onToggle}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {keysUnresolved && (
-        <div className="flex items-start gap-3">
-          {/* The same label column the rows above use, so the line sits under
-              the chips rather than under the provider names. */}
-          <span className="w-20 shrink-0" aria-hidden="true" />
-          <p className="text-xs text-muted-foreground">
-            {heldLine(keyCheckFailed ? "failed" : "checking")}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * One model chip. The tier sits inside it as visible text, in the wizard's
- * vocabulary. A disclosure on hover or focus gives touch users nothing, and no
- * input can reach it on a disabled chip (demo lock, held keys).
- */
-function Chip({
-  model,
-  selected,
-  disabled,
-  onToggle,
-}: {
-  model: RunnerModel;
-  selected: boolean;
-  disabled: boolean;
-  onToggle: (modelId: string, on: boolean) => void;
-}) {
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant={selected ? "default" : "outline"}
-      aria-pressed={selected}
-      disabled={disabled}
-      className="h-7 gap-1.5 font-normal"
-      onClick={() => onToggle(model.id, !selected)}
-    >
-      {model.display_name}{" "}
-      {/* The tier is text, so it carries the same 4.5:1 duty as the name:
-          full-strength on the selected fill, muted only where muting still
-          measures above the floor (paper on void at 70% is 9.7:1). */}
-      <span className={selected ? "text-xs" : "text-xs opacity-70"}>· {model.tier}</span>
-    </Button>
-  );
-}
-
 /** The prompts the plan line counts, as the library already holds them. */
 export interface RunnerPrompt {
   id: string;
@@ -282,6 +157,19 @@ export function Runner({
     [keys.data],
   );
   const keysUnresolved = keys.isPending || keys.isError;
+  const { availability } = useModelAvailability([...keyedProviders]);
+  const menus = useMemo(
+    () =>
+      assistantMenus({
+        groups,
+        selectedIds,
+        keyedProviders,
+        keysUnresolved,
+        locked: locked !== null,
+        availability,
+      }),
+    [groups, selectedIds, keyedProviders, keysUnresolved, locked, availability],
+  );
 
   // The active library's iterations, for the plan line's reconciliation. The
   // answers count itself comes from the planner, never from this arithmetic.
@@ -334,14 +222,14 @@ export function Runner({
         disabled={locked !== null}
         className="m-0 space-y-4 border-0 p-0 disabled:opacity-60"
       >
-        <AssistantRows
-          groups={groups}
-          selectedIds={selectedIds}
-          keyedProviders={keyedProviders}
-          keysUnresolved={keysUnresolved}
-          keyCheckFailed={keys.isError}
-          locked={locked}
+        {/* While the key check is in flight nothing unselected is offered, and
+            the note says so, since no input can reach a tooltip on a disabled
+            control. */}
+        <AssistantPicker
+          menus={menus}
+          locked={locked !== null}
           onToggle={(modelId, on) => void toggle(modelId, on)}
+          note={keysUnresolved ? heldLine(keys.isError ? "failed" : "checking") : null}
         />
 
         <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-4">

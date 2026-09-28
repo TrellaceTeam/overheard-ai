@@ -1,5 +1,6 @@
 import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { AvailabilityView } from "@/lib/assistant-menu";
 import { providerLabel } from "@/lib/failure-reasons";
 import { keyEnvNamesSafe, PROVIDER_KEY_PAGES } from "@/lib/provider-keys";
 import type { KeyStatus, ProviderSlug } from "@/components/types";
@@ -26,12 +27,18 @@ export function KeyStatusList({
   tourId = "key-status",
   showChecks = true,
   onRecheckKeys,
+  availability,
+  modelNames,
 }: {
   statuses: KeyStatus[];
   /** Runs the server-side setup check for one provider. */
   onCheck: (provider: ProviderSlug) => void;
   /** Reads the key status again while a provider has no key. Free, so shown even in the tutorial. */
   onRecheckKeys?: (() => void) | undefined;
+  /** Which catalogue models each key can use, from the providers' own lists. */
+  availability?: Readonly<Record<string, AvailabilityView | undefined>> | undefined;
+  /** Display names of the current catalogue models, by provider model id. */
+  modelNames?: ReadonlyMap<string, string> | undefined;
   /** Null where the panel is reused away from the tour's target. */
   tourId?: string | null | undefined;
   /**
@@ -100,6 +107,10 @@ export function KeyStatusList({
               </Button>
             )}
           </div>
+
+          {status.configured && (
+            <ModelsOnKey report={availability?.[status.provider]} names={modelNames} />
+          )}
         </div>
       ))}
       {onRecheckKeys && statuses.some((status) => !status.configured) && (
@@ -134,5 +145,39 @@ export function KeyStatusList({
         </ul>
       </details>
     </div>
+  );
+}
+
+/**
+ * The current catalogue models a key can and cannot use, as the provider's
+ * own list reports them. Superseded models are left out of the line: they are
+ * kept for past runs, and naming them here would only lengthen it.
+ */
+function ModelsOnKey({
+  report,
+  names,
+}: {
+  report: AvailabilityView | undefined;
+  names: ReadonlyMap<string, string> | undefined;
+}) {
+  if (!report || !names) return null;
+  if (report.status === "error") {
+    return <p className="basis-full text-xs text-muted-foreground">{report.message}</p>;
+  }
+  if (report.status !== "ok") return null;
+  const named = (ids: readonly string[]) =>
+    ids.flatMap((id) => {
+      const name = names.get(id);
+      return name ? [name] : [];
+    });
+  const available = named(report.available);
+  const missing = named(report.missing);
+  return (
+    <p className="basis-full text-xs text-muted-foreground">
+      {available.length > 0
+        ? `Models on this key: ${available.join(", ")}.`
+        : "This key lists none of the models Overheard AI offers."}
+      {missing.length > 0 && ` Not on this key: ${missing.join(", ")}.`}
+    </p>
   );
 }
