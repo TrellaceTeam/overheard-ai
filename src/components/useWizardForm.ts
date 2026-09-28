@@ -14,6 +14,7 @@ import {
   type StarterPrompt,
   starterInputs,
 } from "@/lib/onboarding";
+import type { WizardDraftFields } from "@/lib/setup-draft";
 import type { StarterRequest } from "@/lib/starter-generation";
 
 /** A prompt row. The key stays with the row through edits and removals. */
@@ -122,6 +123,53 @@ export function useWizardForm() {
     });
     setPerceptionPrompt(values.perceptionPrompt);
     setPerceptionDirty(true);
+  }, []);
+
+  /** Everything a reload would lose, for the saved setup draft. */
+  const draftFields = useMemo<WizardDraftFields>(
+    () => ({
+      brandName,
+      category,
+      description,
+      variants,
+      domains,
+      competitors,
+      competitorDomains,
+      prompts: prompts.map(({ text, tag, iterations }) => ({ text, tag, iterations })),
+      promptOrigin,
+      perceptionPrompt,
+      perceptionDirty,
+    }),
+    [
+      brandName,
+      category,
+      description,
+      variants,
+      domains,
+      competitors,
+      competitorDomains,
+      prompts,
+      promptOrigin,
+      perceptionPrompt,
+      perceptionDirty,
+    ],
+  );
+
+  /** Puts a saved draft back. The empty draft is how Start over clears the form. */
+  const restore = useCallback((draft: WizardDraftFields) => {
+    setBrandName(draft.brandName);
+    setCategory(draft.category);
+    setDescription(draft.description);
+    setVariants(draft.variants);
+    setDomains(draft.domains);
+    setCompetitors(draft.competitors);
+    setCompetitorDomains(draft.competitorDomains);
+    setDomainDraft("");
+    setCompetitorDraft("");
+    setPrompts(draft.prompts.map(keyed));
+    setPromptOrigin(draft.promptOrigin);
+    setPerceptionPrompt(draft.perceptionPrompt);
+    setPerceptionDirty(draft.perceptionDirty);
   }, []);
 
   /** Leaving the brand step: the reset rule for the prompts, and the perception prompt. */
@@ -246,7 +294,24 @@ export function useWizardForm() {
     seed,
     advance,
     projectInput,
+    draftFields,
+    restore,
   };
 }
+
+/** The form as it opens, which Start over restores. */
+export const EMPTY_WIZARD_DRAFT: WizardDraftFields = {
+  brandName: "",
+  category: "",
+  description: "",
+  variants: [],
+  domains: [],
+  competitors: [],
+  competitorDomains: {},
+  prompts: [],
+  promptOrigin: null,
+  perceptionPrompt: "",
+  perceptionDirty: false,
+};
 
 export type WizardForm = ReturnType<typeof useWizardForm>;

@@ -13,7 +13,7 @@ import { TOUR_SELECTORS, useTour } from "@/components/TutorialTour";
 import { Button } from "@/components/ui/button";
 import { useProviderChecks } from "@/components/useProviderChecks";
 import { useSelectionCheck } from "@/components/useSelectionCheck";
-import { useWizardForm } from "@/components/useWizardForm";
+import { EMPTY_WIZARD_DRAFT, useWizardForm } from "@/components/useWizardForm";
 import { type CatalogModel, WizardAssistantPicker } from "@/components/WizardAssistantPicker";
 import { WizardBrandStep } from "@/components/WizardBrandStep";
 import { WizardPromptDoors } from "@/components/WizardPromptDoors";
@@ -27,6 +27,13 @@ import { createGate, estimateWizardSpend, pickExtractor } from "@/lib/onboarding
 import { modelPrices } from "@/lib/run-estimate";
 import { newProjectPlan } from "@/lib/run-plan";
 import { toAnswers } from "@/lib/run-progress";
+import {
+  browserStorage,
+  clearSetupDraft,
+  draftHasContent,
+  readSetupDraft,
+  writeSetupDraft,
+} from "@/lib/setup-draft";
 import {
   estimateGenerationCost,
   generateState,
@@ -162,6 +169,40 @@ function Start() {
     setChosenModelIds(oneMidPerProvider(models.data));
   }, [isTutorial, chosenModelIds, models.data]);
 
+  // The unfinished setup survives a reload, outside the tutorial: there the
+  // form holds the demo's values, filled in and locked.
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  const { restore, draftFields } = form;
+  useEffect(() => {
+    if (draftChecked || tutorial.isPending) return;
+    setDraftChecked(true);
+    if (isTutorial) return;
+    const draft = readSetupDraft(browserStorage());
+    if (!draft || !draftHasContent(draft)) return;
+    restore(draft);
+    setStep(draft.step);
+    setChosenModelIds(draft.chosenModelIds);
+    setRestoredAt(draft.savedAt);
+  }, [draftChecked, tutorial.isPending, isTutorial, restore]);
+
+  useEffect(() => {
+    if (!draftChecked || isTutorial || !draftHasContent(draftFields)) return;
+    writeSetupDraft(browserStorage(), {
+      ...draftFields,
+      step: step === 1 ? 1 : 0,
+      chosenModelIds,
+    });
+  }, [draftChecked, isTutorial, draftFields, step, chosenModelIds]);
+
+  function startOver() {
+    clearSetupDraft(browserStorage());
+    restore(EMPTY_WIZARD_DRAFT);
+    setChosenModelIds(null);
+    setRestoredAt(null);
+    setStep(0);
+  }
+
   const keyedProviders = useMemo(
     () => (keys.data ?? []).filter((row) => row.configured).map((row) => String(row.provider)),
     [keys.data],
@@ -188,7 +229,12 @@ function Start() {
     () => defaultAssistantIds(models.data ?? [], keyedProviders),
     [models.data, keyedProviders],
   );
-  const selectedModelIds = chosenModelIds ?? defaultModelIds;
+  // A restored draft can name a model the catalogue no longer offers.
+  const selectedModelIds = useMemo(() => {
+    const ids = chosenModelIds ?? defaultModelIds;
+    const catalogue = models.data;
+    return catalogue ? ids.filter((id) => catalogue.some((model) => model.id === id)) : ids;
+  }, [chosenModelIds, defaultModelIds, models.data]);
   const selectionCheck = useSelectionCheck(selectedModelIds);
 
   const groups = useMemo(() => {
@@ -284,6 +330,7 @@ function Start() {
 
       setCreating(form.brandName.trim());
       const { projectId } = await createProject({ data: form.projectInput(selectedModelIds) });
+      clearSetupDraft(browserStorage());
 
       try {
         const run = await createRun({ data: { projectId } });
@@ -428,6 +475,35 @@ function Start() {
         </div>
 
         <div>
+          {restoredAt !== null && !isTutorial && (
+            <p className="type-meta mb-6">
+              Restored what you typed before.{" "}
+              <button type="button" className="text-primary underline" onClick={startOver}>
+                Start over
+              </button>
+            </p>
+          )}
+
+          {screen === 0 && !isTutorial && availability.state === "off" && (
+            <section className="mb-10 space-y-3" aria-labelledby="first-key">
+              <h2 id="first-key" className="type-section">
+                First, add a provider key
+              </h2>
+              <p className="type-meta">
+                Overheard AI asks the assistants on your own API keys, so it needs at least one
+                before anything can run. Add it to the .env file in the app's folder, then press
+                Check again. There is no need to restart, and what you type below is kept.
+              </p>
+              <KeyStatusList
+                statuses={statuses}
+                onCheck={(p) => void checkProvider(p)}
+                onRecheckKeys={() => void keys.refetch()}
+                showChecks={false}
+                tourId={null}
+              />
+            </section>
+          )}
+
           {screen === 0 && (
             <WizardBrandStep form={form} locked={isTutorial} onContinue={continueToQuestions} />
           )}
