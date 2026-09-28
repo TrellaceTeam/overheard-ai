@@ -138,7 +138,7 @@ export async function buyProse(input: BuyProseInput, call?: ProseCall): Promise<
       const provider = error.message.slice(MISSING_CREDENTIAL_PREFIX.length);
       throw new InvalidInputError(
         "MISSING_CREDENTIAL",
-        `no API key is configured for ${provider}; add it to .env and restart`,
+        `no API key is configured for ${provider}; add it to .env and try again`,
       );
     }
     if (mayHaveBilled(error)) logUsage(null, "error");

@@ -74,7 +74,7 @@ export function createPerceptionRun(
     const missing = providersNeeded(db, projectId).filter((provider) => !withKeys.has(provider));
     if (missing.length > 0) {
       throw new Error(
-        `MISSING_CREDENTIAL: no API key configured for ${missing.join(", ")}. Add it to .env and restart.`,
+        `MISSING_CREDENTIAL: no API key configured for ${missing.join(", ")}. Add it to .env and run again.`,
       );
     }
   }

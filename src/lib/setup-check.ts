@@ -349,7 +349,7 @@ export function searchNoKey(provider: Provider): SearchCheckResult {
   return result(
     provider,
     "no_key",
-    `No ${provider} key is configured, so nothing was checked. Add ${keyEnvNames(provider)} to your .env file and restart.`,
+    `No ${provider} key is configured, so nothing was checked. Add ${keyEnvNames(provider)} to your .env file and check again.`,
   );
 }
 

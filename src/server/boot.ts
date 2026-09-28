@@ -13,6 +13,7 @@
 import { getDb } from "./db/client";
 import { databasePathFromEnv, type Driver } from "./db/driver";
 import { bootRecovery } from "./logic/recovery";
+import { watchEnvFile } from "./worker/env-file";
 import { configuredProviders } from "./worker/keys";
 import { mockProvidersEnabled } from "./worker/mock-provider";
 import { startWorker, stopWorker, workerStatus, WORKER_ID } from "./worker/loop";
@@ -43,6 +44,11 @@ export interface BootOptions {
   startLoops?: boolean;
   /** Set false to boot quietly. The app logs one line. */
   log?: boolean;
+  /**
+   * The .env file to re-read provider keys from while running. Only the app
+   * entry passes it, so no test reads a real .env.
+   */
+  envFile?: string;
 }
 
 /**
@@ -54,6 +60,7 @@ export function boot(options: BootOptions = {}): BootSummary {
   const already = holder[BOOT_KEY];
   if (already) return already;
 
+  if (options.envFile) watchEnvFile(options.envFile);
   const db = options.db ?? getDb();
   const recovered = bootRecovery(db);
 

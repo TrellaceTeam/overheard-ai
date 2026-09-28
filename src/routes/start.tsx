@@ -179,7 +179,10 @@ function Start() {
 
   // One representative model per provider. The create gate below checks the
   // exact models chosen instead.
-  const { statuses, check: checkProvider } = useProviderChecks(keys.data);
+  const { statuses, check: checkProvider } = useProviderChecks(
+    keys.data,
+    () => void keys.refetch(),
+  );
 
   const defaultModelIds = useMemo(
     () => defaultAssistantIds(models.data ?? [], keyedProviders),
@@ -468,6 +471,7 @@ function Start() {
                 <KeyStatusList
                   statuses={statuses}
                   onCheck={(p) => void checkProvider(p)}
+                  onRecheckKeys={() => void keys.refetch()}
                   showChecks={!isTutorial}
                   tourId={TOUR_SELECTORS.wizardKeys}
                 />

@@ -22,13 +22,28 @@ describe("KeyStatusList", () => {
     expect(screen.getByText("ANTHROPIC_API_KEY")).toBeDefined();
   });
 
-  it("only lets a configured provider be checked", () => {
+  it("runs the paid check only for a configured provider", () => {
     const onCheck = vi.fn();
     render(<KeyStatusList statuses={statuses} onCheck={onCheck} />);
-    const buttons = screen.getAllByRole("button", { name: /Check/ });
-    expect(buttons[1]?.hasAttribute("disabled")).toBe(true);
+    const buttons = screen.getAllByRole("button", { name: "Check" });
+    expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0]!);
     expect(onCheck).toHaveBeenCalledWith("openai");
+  });
+
+  it("offers one free Check again while a provider has no key, since .env is read again", () => {
+    const onCheck = vi.fn();
+    const onRecheckKeys = vi.fn();
+    render(<KeyStatusList statuses={statuses} onCheck={onCheck} onRecheckKeys={onRecheckKeys} />);
+    expect(screen.getAllByRole("button", { name: "Check again" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(onRecheckKeys).toHaveBeenCalledOnce();
+    expect(onCheck).not.toHaveBeenCalled();
+  });
+
+  it("offers no Check again once every provider has a key", () => {
+    render(<KeyStatusList statuses={[statuses[0]!]} onCheck={() => {}} onRecheckKeys={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
   });
 
   it("offers the key dashboards behind a disclosure", () => {
@@ -82,7 +97,8 @@ describe("KeyStatusList", () => {
   it("carries the tour attribute and says keys never reach the browser", () => {
     const { container } = render(<KeyStatusList statuses={statuses} onCheck={() => {}} />);
     expect(container.querySelector('[data-tour="key-status"]')).not.toBeNull();
-    expect(screen.getByText(/never sends them to the browser/)).toBeDefined();
+    expect(screen.getByText(/never sends keys to the browser/)).toBeDefined();
+    expect(screen.getByText(/needs no restart/)).toBeDefined();
   });
 });
 
@@ -93,5 +109,18 @@ describe("KeyStatusList without checks (tutorial mode)", () => {
     expect(screen.getByText(/No key. Add/)).toBeDefined();
     expect(screen.getByText("ANTHROPIC_API_KEY")).toBeDefined();
     expect(screen.queryByRole("button", { name: /Check/ })).toBeNull();
+  });
+
+  it("still lets a row with no key check again, which spends nothing", () => {
+    render(
+      <KeyStatusList
+        statuses={statuses}
+        onCheck={() => {}}
+        onRecheckKeys={() => {}}
+        showChecks={false}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Check again" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Check" })).toBeNull();
   });
 });

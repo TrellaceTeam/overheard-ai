@@ -82,7 +82,7 @@ function missingCredentialCard(slug: string): Card {
     key: `missing-credential:${slug}`,
     owner: "you",
     title: `No ${provider} API key configured`,
-    advice: `Add ${keyEnvNamesSafe(slug.toLowerCase()) ?? `your ${provider} key`} to the .env file in the app's folder, restart Overheard AI, then run again. The template, .env.example, lists every variable name.`,
+    advice: `Add ${keyEnvNamesSafe(slug.toLowerCase()) ?? `your ${provider} key`} to the .env file in the app's folder, then run again. There is no need to restart. The template, .env.example, lists every variable name.`,
   };
 }
 
@@ -194,7 +194,7 @@ function authCard(status: number): Card {
     owner: "you",
     title: "The provider rejected your API key",
     advice:
-      "The key is present but the provider refused it. Check it is still valid and has billing enabled, then update it in your .env file and restart.",
+      "The key is present but the provider refused it. Check it is still valid and has billing enabled, then update it in your .env file and run again.",
   };
 }
 

@@ -294,7 +294,7 @@ describe("summarizePromptAnswers, the money rules", () => {
     const refused = async () => {
       throw new InvalidInputError(
         "MISSING_CREDENTIAL",
-        "no API key is configured for anthropic; add it to .env and restart",
+        "no API key is configured for anthropic; add it to .env and try again",
       );
     };
 

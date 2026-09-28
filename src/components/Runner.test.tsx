@@ -276,7 +276,7 @@ describe("AssistantRows", () => {
       }),
     );
     expect(screen.queryByRole("button", { name: /Gemini One/ })).toBeNull();
-    expect(screen.getByText(/No Google key\. Set GOOGLE_API_KEY/)).toBeTruthy();
+    expect(screen.getByText(/No Google key\. Add GOOGLE_API_KEY/)).toBeTruthy();
   });
 
   it("keeps a selected chip on a keyless row, so a model whose key disappeared can be switched off", () => {

@@ -60,7 +60,8 @@ Never write an API key into a file, a command or a message. If a step fails, sho
 error and stop.
 ```
 
-The agent never handles a key. You paste yours into `.env` and restart.
+The agent never handles a key. You paste yours into `.env`, and the app picks it up without a
+restart.
 
 ## What it measures
 
@@ -94,8 +95,9 @@ measurement of Ramp or its competitors.
 
 ## Keys
 
-One key is enough. Overheard AI only calls providers you have a key for. It reads keys at
-start, so restart after you change `.env`.
+One key is enough. Overheard AI only calls providers you have a key for. It reads `.env` again
+whenever it looks up a key, so a key you add or change there needs no restart. A key set in
+your shell wins over the file.
 
 | Provider | Variable in `.env` | Assistants | Extraction model |
 | --- | --- | --- | --- |

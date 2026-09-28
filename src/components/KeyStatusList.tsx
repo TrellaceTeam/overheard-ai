@@ -12,7 +12,9 @@ import type { KeyStatus, ProviderSlug } from "@/components/types";
  * what the provider said when it was last checked. "Check" runs the setup check
  * on the server: one short call to the provider's representative model with web
  * search forced, and a verdict from lib/setup-check with a status, a sentence
- * for the user and where to fix it.
+ * for the user and where to fix it. While a provider has no key, one "Check
+ * again" under the rows reads the key status again: the server re-reads .env
+ * on every read, so that costs nothing and needs no restart.
  *
  * With OVERHEARD_MOCK_PROVIDERS=1 the offline seam answers for every provider,
  * so `configured` is true with no key anywhere. `source` tells the row which of
@@ -23,10 +25,13 @@ export function KeyStatusList({
   onCheck,
   tourId = "key-status",
   showChecks = true,
+  onRecheckKeys,
 }: {
   statuses: KeyStatus[];
   /** Runs the server-side setup check for one provider. */
   onCheck: (provider: ProviderSlug) => void;
+  /** Reads the key status again while a provider has no key. Free, so shown even in the tutorial. */
+  onRecheckKeys?: (() => void) | undefined;
   /** Null where the panel is reused away from the tour's target. */
   tourId?: string | null | undefined;
   /**
@@ -59,7 +64,7 @@ export function KeyStatusList({
               <code className="num text-foreground">
                 {keyEnvNamesSafe(status.provider) ?? "its API key"}
               </code>{" "}
-              to your .env file, then restart.
+              to your .env file.
             </span>
           )}
 
@@ -80,12 +85,12 @@ export function KeyStatusList({
                 )}
               </span>
             )}
-            {showChecks && (
+            {showChecks && status.configured && (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={!status.configured || status.result.state === "checking"}
+                disabled={status.result.state === "checking"}
                 onClick={() => onCheck(status.provider)}
               >
                 {status.result.state === "checking" && (
@@ -97,10 +102,21 @@ export function KeyStatusList({
           </div>
         </div>
       ))}
+      {onRecheckKeys && statuses.some((status) => !status.configured) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <p className="text-xs text-muted-foreground">
+            Added a key to .env? Check again to pick it up. There is no need to restart.
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={onRecheckKeys}>
+            Check again
+          </Button>
+        </div>
+      )}
       <p className="p-4 text-xs text-muted-foreground">
-        Overheard AI reads keys from the environment when it starts. It never sends them to the
-        browser, writes them to the database or logs them. Change one in your .env and restart to
-        pick it up. The provider bills your runs to you directly.
+        Overheard AI reads keys from the .env file in its folder, and reads it again whenever it
+        looks one up, so a key you add or change there needs no restart. A key set in your shell
+        wins over the file. It never sends keys to the browser, writes them to the database or logs
+        them. The provider bills your runs to you directly.
       </p>
       <details className="px-4 pb-4">
         <summary className="cursor-pointer py-1 text-xs text-muted-foreground">

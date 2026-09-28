@@ -153,9 +153,9 @@ export function AssistantRows({
                   />
                 ))}
                 <span>
-                  No {providerLabel(group.provider)} key. Set{" "}
-                  {keyEnvNamesSafe(group.provider) ?? "its API key"} in your environment and restart
-                  Overheard AI to ask it.
+                  No {providerLabel(group.provider)} key. Add{" "}
+                  {keyEnvNamesSafe(group.provider) ?? "its API key"} to your .env file to ask it.
+                  There is no need to restart.
                 </span>
               </p>
             ) : (

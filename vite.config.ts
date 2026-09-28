@@ -55,6 +55,12 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+  // Otherwise Vite restarts the dev server and reloads the page whenever .env
+  // changes, which throws away everything typed into setup. Nothing in the
+  // browser reads import.meta.env, TanStack Start's own plugin still loads .env
+  // into process.env at start, and src/server/worker/env-file.ts re-reads the
+  // provider keys after that.
+  envDir: false,
   // Local-first tool. Never listen on a public interface.
   //
   // PORT is read here as well as in server/index.mjs, so `PORT=3100 npm run dev`

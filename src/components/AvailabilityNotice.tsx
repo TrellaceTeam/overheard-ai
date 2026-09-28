@@ -2,7 +2,7 @@ import type { Availability } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 
 export const NO_KEY_CONFIGURED =
-  "No provider key is configured, so nothing can be asked yet. Set OPENAI_API_KEY, ANTHROPIC_API_KEY or GOOGLE_API_KEY in your environment and restart Overheard AI.";
+  "No provider key is configured, so nothing can be asked yet. Add OPENAI_API_KEY, ANTHROPIC_API_KEY or GOOGLE_API_KEY to the .env file in the app's folder, then press Check again. There is no need to restart.";
 
 /**
  * Renders the states of a gate that is not on: still checking, could not

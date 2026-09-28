@@ -4,11 +4,14 @@
  *
  * Keys are read from the environment at call time, never at module scope, and
  * never written to the database, so a copy of the SQLite file holds no key.
+ * Each read first brings the key variables in line with .env (env-file.ts),
+ * so a key added while the app runs is used without a restart.
  * Only resolveProviderKey and providerKeyValues return key values, for the
  * adapters and the error scrubber. Nothing here logs or renders one.
  * keyStatus() is all the Settings and Start screens see.
  */
 import type { Provider } from "../db/types";
+import { refreshEnvKeys } from "./env-file";
 import { mockProvidersEnabled } from "./mock-provider";
 
 // The env var names per provider, in the order they are tried. GEMINI_API_KEY
@@ -48,6 +51,7 @@ function isHeaderSafe(value: string): boolean {
 
 /** What is in the environment for one provider, before it is judged. */
 function envKey(provider: Provider): string | null {
+  refreshEnvKeys();
   for (const name of PROVIDER_KEY_ENV[provider]) {
     const value = process.env[name];
     if (value?.trim()) return value.trim();
@@ -74,6 +78,7 @@ export function resolveProviderKey(provider: Provider): string | null {
  * at call time, like every other read of a key.
  */
 export function providerKeyValues(): string[] {
+  refreshEnvKeys();
   const values = new Set<string>();
   for (const names of Object.values(PROVIDER_KEY_ENV)) {
     for (const name of names) {

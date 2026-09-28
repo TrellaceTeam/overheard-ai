@@ -15,7 +15,9 @@
  * its own, `vite dev` reads it, and `npm start` passes Node
  * --env-file-if-exists=.env so the three agree. In all three a variable already
  * in the shell wins over the file. Running `node server/index.mjs` directly
- * skips .env, which is what you want when passing env inline.
+ * skips .env at start, which is what you want when passing env inline. Provider
+ * keys alone are then re-read from .env while the app runs
+ * (src/server/worker/env-file.ts), still behind any value the shell set.
  */
 import { fileURLToPath } from "node:url";
 import { serve } from "srvx";

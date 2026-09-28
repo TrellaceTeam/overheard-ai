@@ -33,6 +33,6 @@ describe("AvailabilityNotice", () => {
   it("states the no-key case by naming the environment variables", () => {
     render(<AvailabilityNotice availability={{ state: "off", reason: NO_KEY_CONFIGURED }} />);
     expect(screen.getByText(/OPENAI_API_KEY/)).toBeDefined();
-    expect(screen.getByText(/restart Overheard AI/)).toBeDefined();
+    expect(screen.getByText(/no need to restart/)).toBeDefined();
   });
 });

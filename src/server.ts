@@ -6,17 +6,20 @@
  *
  * 1. boot(). Migrations, seeding, recovery, the worker loop and the schedule
  *    sweep. Calling it at module scope means `vite dev` and `node server/index.mjs`
- *    start the same way, and each prints the same [boot] line.
+ *    start the same way, and each prints the same [boot] line. It also starts
+ *    re-reading provider keys from the .env in the folder the app was started
+ *    from, the same file the start scripts load.
  * 2. The loopback gate. Every request passes localRequestGuard before it
  *    reaches a route or a server function, and every response carries the
  *    anti-framing headers. See src/server/security.ts for the two attacks that
  *    survive binding to 127.0.0.1.
  */
+import { resolve } from "node:path";
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { boot, shutdown } from "./server/boot";
 import { guarded } from "./server/security";
 
-boot();
+boot({ envFile: resolve(process.cwd(), ".env") });
 
 /**
  * Ctrl-C stops the loops before the process leaves, so nothing new is claimed.

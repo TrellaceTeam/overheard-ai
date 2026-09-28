@@ -20,7 +20,14 @@ export type ProviderKeyRow = Omit<KeyStatus, "result">;
  * owns, because the wizard reads more from that query than the statuses:
  * which providers have keys, and the availability state.
  */
-export function useProviderChecks(rows: readonly ProviderKeyRow[] | undefined): {
+export function useProviderChecks(
+  rows: readonly ProviderKeyRow[] | undefined,
+  /**
+   * Runs after every check. The check re-reads .env on the server, so the
+   * caller refetches its key rows here to show a key added since they loaded.
+   */
+  afterCheck?: () => void,
+): {
   /** The key rows joined with each provider's latest check verdict. */
   statuses: KeyStatus[];
   /** Runs the server-side setup check for one provider. */
@@ -61,6 +68,8 @@ export function useProviderChecks(rows: readonly ProviderKeyRow[] | undefined): 
           message: errorText(error, "Could not run the setup check"),
         },
       }));
+    } finally {
+      afterCheck?.();
     }
   }
 

@@ -159,7 +159,7 @@ function Settings() {
 
   // The check state lives in the hook. This route keeps the key query because
   // the Provider keys section also renders its read error.
-  const { statuses, check } = useProviderChecks(keys.data);
+  const { statuses, check } = useProviderChecks(keys.data, () => void keys.refetch());
 
   return (
     <main className="mx-auto max-w-3xl space-y-8 px-4 py-10">
@@ -180,7 +180,11 @@ function Settings() {
             We could not read the key status just now. Reload to try again.
           </p>
         ) : (
-          <KeyStatusList statuses={statuses} onCheck={(provider) => void check(provider)} />
+          <KeyStatusList
+            statuses={statuses}
+            onCheck={(provider) => void check(provider)}
+            onRecheckKeys={() => void keys.refetch()}
+          />
         )}
         <p className="text-xs text-muted-foreground">
           The setup check costs about a cent per OpenAI or Anthropic model and nothing noticeable on
