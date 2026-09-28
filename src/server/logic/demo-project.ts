@@ -264,13 +264,18 @@ function generateDemoProject(db: Driver, today: Date): string {
      VALUES (?, ?, ?, 1, ?, ?)`,
   ).run(projectId, DEMO_BRAND.name, extractor.id, firstDay.toISOString(), firstDay.toISOString());
 
+  // The screens list brands and prompts by created_at, then by id, which is
+  // random. One minute apart in list order keeps every demo in the same order.
+  let order = 0;
+  const nextCreatedAt = () => plusMinutes(firstDay, order++).toISOString();
+
   const brandIds = new Map<string, string>();
   const insertBrand = (name: string, domain: string, role: "target" | "competitor"): void => {
     const id = randomUUID();
     db.prepare(
       `INSERT INTO brands (id, project_id, name, role, variants, domains, suggested_domains, created_at)
        VALUES (?, ?, ?, ?, '[]', ?, '[]', ?)`,
-    ).run(id, projectId, name, role, JSON.stringify([domain]), firstDay.toISOString());
+    ).run(id, projectId, name, role, JSON.stringify([domain]), nextCreatedAt());
     brandIds.set(name, id);
   };
   insertBrand(DEMO_BRAND.name, DEMO_BRAND.domain, "target");
@@ -280,18 +285,11 @@ function generateDemoProject(db: Driver, today: Date): string {
 
   const promptRows = DEMO_PROMPTS.map((prompt) => {
     const id = randomUUID();
+    const createdAt = nextCreatedAt();
     db.prepare(
       `INSERT INTO prompts (id, project_id, text, category, iterations, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
-    ).run(
-      id,
-      projectId,
-      prompt.text,
-      prompt.category,
-      DEMO_ITERATIONS,
-      firstDay.toISOString(),
-      firstDay.toISOString(),
-    );
+    ).run(id, projectId, prompt.text, prompt.category, DEMO_ITERATIONS, createdAt, createdAt);
     const selfReferenced = prompt.text.includes(DEMO_BRAND.name);
     return { id, text: prompt.text, selfReferenced };
   });

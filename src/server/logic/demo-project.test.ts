@@ -187,6 +187,28 @@ describe("the demo history", () => {
     }
   });
 
+  it("lists its brands and prompts in the same order on every build", () => {
+    // The screens order both by created_at, then by a random id.
+    const order = (handle: Driver, id: string) => ({
+      brands: handle
+        .prepare("SELECT name FROM brands WHERE project_id = ? ORDER BY created_at, id")
+        .all<{ name: string }>(id)
+        .map((row) => row.name),
+      prompts: handle
+        .prepare("SELECT text FROM prompts WHERE project_id = ? ORDER BY created_at, id")
+        .all<{ text: string }>(id)
+        .map((row) => row.text),
+    });
+    const other = freshDb();
+    try {
+      const second = ensureDemoProject(other, { today: TODAY }).projectId;
+      expect(order(other, second)).toEqual(order(db, projectId));
+      expect(order(db, projectId).brands[0]).toBe(DEMO_BRAND.name);
+    } finally {
+      other.close();
+    }
+  });
+
   it("scores through the real pipeline: tasks done, extractions, metrics at both levels", () => {
     const tasks = one<{ n: number; done: number }>(
       `SELECT COUNT(*) AS n, SUM(status = 'done') AS done FROM run_tasks
