@@ -15,8 +15,9 @@ import {
   updateProject,
 } from "./projects";
 
-const GPT_LUNA = "e473c6ad-df52-4ee6-bf96-f7913077f8d1";
-const GEMINI_FLASH_LITE = "695e8bbd-b115-4c03-84b0-f91e20890a13";
+// The current extractors. The superseded ones rank after them and are never picked.
+const GPT_LUNA = "f7473ade-c43e-49b3-9db5-00bbfb2b3d00";
+const GEMINI_FLASH_LITE = "f970f5ef-4809-4181-8c17-c1cb75eef4e2";
 
 let db: Driver;
 
@@ -434,7 +435,7 @@ describe("createProjectGated", () => {
     await createProjectGated(db, base(), { providersWithKeys: ["openai"] }, probe);
     expect(seen).toEqual([
       ["assistant", "claude-sonnet-5"],
-      ["extractor", "gpt-5.6-luna"],
+      ["extractor", "gpt-6-luna"],
     ]);
   });
 

@@ -36,6 +36,7 @@ const SHIPPED = [
   "0010_inflight_caps_setting",
   "0011_project_description",
   "0012_answer_model",
+  "0013_model_superseded",
 ];
 
 describe("migrate", () => {
@@ -103,10 +104,13 @@ describe("migrate", () => {
     // and the answers keep counting.
     const handle = db();
     migrate(handle, builtInMigrations().slice(0, 2));
-    seedModels(handle);
-    const model = handle
-      .prepare("SELECT id FROM models WHERE provider = 'anthropic' LIMIT 1")
-      .get<{ id: string }>()!.id;
+    // One model row by hand: the seed writes columns later migrations add.
+    const model = "model-1";
+    handle
+      .prepare(
+        "INSERT INTO models (id, provider, model_id, display_name) VALUES (?, 'anthropic', 'assistant-alpha', 'Assistant Alpha')",
+      )
+      .run(model);
 
     handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Acme Analytics')").run();
     handle
@@ -160,6 +164,7 @@ describe("migrate", () => {
       "0010_inflight_caps_setting",
       "0011_project_description",
       "0012_answer_model",
+      "0013_model_superseded",
     ]);
 
     const count = (sql: string) => handle.prepare(sql).get<{ c: number }>()!.c;
@@ -210,6 +215,7 @@ describe("migrate", () => {
       "0010_inflight_caps_setting",
       "0011_project_description",
       "0012_answer_model",
+      "0013_model_superseded",
     ]);
 
     const rows = () =>
@@ -241,6 +247,7 @@ describe("migrate", () => {
       "0010_inflight_caps_setting",
       "0011_project_description",
       "0012_answer_model",
+      "0013_model_superseded",
     ]);
 
     const row = handle
@@ -279,6 +286,7 @@ describe("migrate", () => {
       "0010_inflight_caps_setting",
       "0011_project_description",
       "0012_answer_model",
+      "0013_model_superseded",
     ]);
 
     const rows = handle
@@ -302,6 +310,33 @@ describe("migrate", () => {
     insert.run("p2", "Northwind Metrics", "x".repeat(280));
     expect(description("p2")).toHaveLength(280);
     expect(() => insert.run("p3", "Contoso Insights", "x".repeat(281))).toThrow();
+  });
+
+  it("starts every existing model as current, and the seed marks the replaced ones", () => {
+    const handle = db();
+    migrate(
+      handle,
+      builtInMigrations().filter((m) => m.version < "0013"),
+    );
+    handle
+      .prepare(
+        "INSERT INTO models (id, provider, model_id, display_name) VALUES ('m1', 'openai', 'assistant-alpha', 'Assistant Alpha')",
+      )
+      .run();
+
+    expect(migrate(handle)).toEqual(["0013_model_superseded"]);
+    const flag = (modelId: string) =>
+      handle
+        .prepare("SELECT superseded FROM models WHERE model_id = ?")
+        .get<{ superseded: number }>(modelId)?.superseded;
+    expect(flag("assistant-alpha")).toBe(0);
+    expect(() =>
+      handle.prepare("UPDATE models SET superseded = 2 WHERE id = 'm1'").run(),
+    ).toThrow();
+
+    seedModels(handle);
+    expect(flag("gpt-5.6-terra")).toBe(1);
+    expect(flag("gpt-6-sol")).toBe(0);
   });
 
   it("records nothing when a migration throws", () => {

@@ -27,6 +27,7 @@ export interface GenerationCandidate {
   provider: string;
   tier: string;
   is_active: number;
+  superseded?: number;
   input_price_per_mtok: number | string;
   output_price_per_mtok: number | string;
 }
@@ -40,8 +41,9 @@ function tieRank(provider: string): number {
 }
 
 /**
- * The model the generation call goes to: the cheapest active mid-tier model
- * of a keyed provider, by input price, then output price, then provider. With
+ * The model the generation call goes to: the cheapest active, current mid-tier
+ * model of a keyed provider, by input price, then output price, then provider.
+ * A superseded model can cost the same as its replacement. With
  * no such model, the shared extraction rule instead of a refusal: the
  * preferred extractor when it is keyed, else the cheapest keyed extractor.
  * Null only when no keyed provider has any active model to call.
@@ -61,7 +63,12 @@ export function pickGenerationModel<T extends GenerationCandidate>(
   const mid = [...catalogue, ...extractionModels].filter((model) => {
     if (seen.has(model.id)) return false;
     seen.add(model.id);
-    return model.tier === "mid" && model.is_active === 1 && keyed.has(model.provider);
+    return (
+      model.tier === "mid" &&
+      model.is_active === 1 &&
+      model.superseded !== 1 &&
+      keyed.has(model.provider)
+    );
   });
   if (mid.length > 0) {
     mid.sort(

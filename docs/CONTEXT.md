@@ -68,6 +68,14 @@ _Avoid_: prompt summary (ambiguous between the two), aggregate summary, cross-ru
 A prompt results summary written before the latest finished run with answers for its prompt. It is flagged and offers a re-ask; it is never replaced or re-bought automatically.
 _Avoid_: stale summary (in user-facing text)
 
+**Superseded model**:
+A catalogue model a newer one from the same provider replaced. It stays callable for the projects that already ask it, so their trends keep comparing the same model, and it is never preselected or auto-picked for a new project.
+_Avoid_: deprecated model, legacy model (in user-facing text)
+
+**Model version**:
+The version the provider reports for one answer, stored beside the catalogue model that was asked. It can name a dated snapshot behind the model's id.
+_Avoid_: model string, snapshot id
+
 ### Running
 
 **Runner**:

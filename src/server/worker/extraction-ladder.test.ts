@@ -22,14 +22,15 @@ import {
 import { ProviderError, type ProviderResult } from "./providers";
 
 /** Catalogue ids, named so an expected order reads as models, not uuids. */
-const LUNA = "gpt-5.6-luna"; // openai, extraction, rank 1
-const TERRA = "gpt-5.6-terra"; // openai, mid
-const SOL = "gpt-5.6-sol"; // openai, frontier
+const LUNA = "gpt-6-luna"; // openai, extraction, rank 1
+const SOL = "gpt-6-sol"; // openai, mid
+const ASTRA = "gpt-6-astra"; // openai, frontier
 const HAIKU = "claude-haiku-4-5"; // anthropic, extraction, rank 3
 const SONNET = "claude-sonnet-5"; // anthropic, mid
-const OPUS = "claude-opus-5"; // anthropic, frontier
-const FLASH_LITE = "gemini-3.1-flash-lite"; // google, extraction, rank 2
-const GEMINI_FLASH = "gemini-3.6-flash"; // google, mid
+const OPUS = "claude-opus-5-5"; // anthropic, frontier
+const FLASH_LITE = "gemini-3.5-flash-lite"; // google, extraction, rank 2
+const GEMINI_FLASH = "gemini-3.8-flash"; // google, mid
+const OLD_GEMINI_FLASH = "gemini-3.6-flash"; // google, mid, superseded, same price
 
 let db: Driver;
 let restoreKeys: () => void = () => {};
@@ -59,13 +60,16 @@ afterEach(() => {
 describe("nextTierUp", () => {
   it("climbs extraction to mid, mid to frontier, and stops at the top", () => {
     restoreKeys = setProviderKeys("OPENAI_API_KEY");
-    expect(nextTierUp(modelOf(LUNA), [modelOf(LUNA), modelOf(TERRA), modelOf(SOL)])?.model_id).toBe(
-      TERRA,
-    );
+    const openai = [modelOf(LUNA), modelOf(SOL), modelOf(ASTRA)];
+    expect(nextTierUp(modelOf(LUNA), openai)?.model_id).toBe(SOL);
+    expect(nextTierUp(modelOf(SOL), openai)?.model_id).toBe(ASTRA);
+    expect(nextTierUp(modelOf(ASTRA), openai)).toBeNull();
+  });
+
+  it("prefers a current model over a superseded one of the same tier and price", () => {
     expect(
-      nextTierUp(modelOf(TERRA), [modelOf(LUNA), modelOf(TERRA), modelOf(SOL)])?.model_id,
-    ).toBe(SOL);
-    expect(nextTierUp(modelOf(SOL), [modelOf(LUNA), modelOf(TERRA), modelOf(SOL)])).toBeNull();
+      nextTierUp(modelOf(FLASH_LITE), [modelOf(OLD_GEMINI_FLASH), modelOf(GEMINI_FLASH)])?.model_id,
+    ).toBe(GEMINI_FLASH);
   });
 
   it("never climbs sideways into another provider's catalog", () => {
@@ -78,9 +82,8 @@ describe("nextTierUp", () => {
     expect(nextTierUp(modelOf(HAIKU), active)?.model_id).toBe(OPUS);
   });
 
-  it("picks the cheapest model of the next tier when a provider has several", () => {
-    // Google's mid model costs the same as its frontier one, so the tier order
-    // decides before the price does.
+  it("climbs one tier at a time when a provider has several above", () => {
+    // The tier order decides before the price does.
     expect(
       nextTierUp(modelOf(FLASH_LITE), [
         modelOf(FLASH_LITE),
@@ -105,7 +108,7 @@ describe("extractionLadder", () => {
     // Luna is the cheapest keyed extractor, so the third rung adds nothing and
     // the ladder is shorter.
     restoreKeys = setProviderKeys("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY");
-    expect(ids(extractionLadder(db, modelOf(LUNA)))).toEqual([LUNA, TERRA]);
+    expect(ids(extractionLadder(db, modelOf(LUNA)))).toEqual([LUNA, SOL]);
   });
 
   it("counts only providers with a key for the cheapest-extractor rung", () => {

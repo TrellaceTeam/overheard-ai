@@ -38,7 +38,8 @@ export const LADDER_MAX_RUNGS = 3;
 
 /**
  * The same provider's next tier up: the cheapest active model on that provider
- * whose tier outranks the current reader's, or null.
+ * whose tier outranks the current reader's, current before superseded, or
+ * null.
  *
  * Active models only. A model the user switched off in Settings is one they do
  * not want to pay for.
@@ -57,6 +58,7 @@ export function nextTierUp(preferred: ModelRow, models: readonly ModelRow[]): Mo
   higher.sort(
     (a, b) =>
       TIER_ORDER[a.tier] - TIER_ORDER[b.tier] ||
+      a.superseded - b.superseded ||
       Number(a.input_price_per_mtok) - Number(b.input_price_per_mtok),
   );
   return higher[0] ?? null;

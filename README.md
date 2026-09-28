@@ -101,9 +101,14 @@ your shell wins over the file.
 
 | Provider | Variable in `.env` | Assistants | Extraction model |
 | --- | --- | --- | --- |
-| [OpenAI](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | `gpt-5.6-sol`<br>`gpt-5.6-terra` | `gpt-5.6-luna` |
-| [Anthropic](https://console.anthropic.com/settings/keys) | `ANTHROPIC_API_KEY` | `claude-opus-5`<br>`claude-sonnet-5` | `claude-haiku-4-5` |
-| [Google](https://aistudio.google.com/apikey) | `GOOGLE_API_KEY`<br>or `GEMINI_API_KEY` | `gemini-3.1-pro-preview`<br>`gemini-3.6-flash` | `gemini-3.1-flash-lite` |
+| [OpenAI](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | `gpt-6-astra`<br>`gpt-6-sol` | `gpt-6-luna` |
+| [Anthropic](https://console.anthropic.com/settings/keys) | `ANTHROPIC_API_KEY` | `claude-opus-5-5`<br>`claude-sonnet-5` | `claude-haiku-4-5` |
+| [Google](https://aistudio.google.com/apikey) | `GOOGLE_API_KEY`<br>or `GEMINI_API_KEY` | `gemini-3.1-pro-preview`<br>`gemini-3.8-flash` | `gemini-3.5-flash-lite` |
+
+The list only holds models checked against a run's request. Every answer has to come from a
+web search, and each provider's models differ in what a request may ask of them. When a
+newer model replaces one, the older one stays for the projects already asking it, so their
+trends keep comparing the same model, and new projects start on the newer one.
 
 Before it creates a project, the setup screen runs a setup check. It makes one short call to
 each assistant you picked, with web search forced, and one to the extraction model. A bad key,
@@ -196,8 +201,8 @@ picked. `npm run test:bun` runs the tests under Bun.
 
 - It asks the APIs, not the apps. Answers come from each provider's API with web search on,
   which is close to what people see in ChatGPT, Claude or Gemini, but not the same.
-- Gemini can't be forced to search. An answer with no search is retried, then counted as
-  failed, and you still pay for the call.
+- Gemini and Claude Opus 5.5 can't be forced to search, so they are told to. An answer with
+  no search is retried, then counted as failed, and you still pay for the call.
 - Stopping the app mid-run can repeat up to 15 calls, the ones in flight when it stopped.
 - Node 22 and 24 print `ExperimentalWarning: SQLite is an experimental feature` at boot. It is
   harmless. Node 25 and Bun don't print it.

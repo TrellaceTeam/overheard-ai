@@ -41,6 +41,15 @@ describe("defaultAssistantIds", () => {
     const onlyEdges = CATALOGUE.filter((model) => model.tier !== "mid");
     expect(defaultAssistantIds(onlyEdges, ["anthropic", "openai"])).toEqual([]);
   });
+
+  it("never preselects a superseded model, even one listed first", () => {
+    const withOld = [
+      { id: "gpt-old-mid", provider: "openai", tier: "mid", superseded: 1 },
+      { id: "gpt-mid", provider: "openai", tier: "mid", superseded: 0 },
+    ];
+    expect(defaultAssistantIds(withOld, ["openai"])).toEqual(["gpt-mid"]);
+    expect(oneMidPerProvider(withOld)).toEqual(["gpt-mid"]);
+  });
 });
 
 describe("clampIterations", () => {

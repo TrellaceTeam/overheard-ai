@@ -47,6 +47,8 @@ export interface ModelRow {
   is_extraction_model: SqlBool;
   /** Lower is preferred as the extractor. Null on a model that cannot extract. */
   extraction_rank: number | null;
+  /** A newer model replaced it: kept for projects that ask it, never preselected. */
+  superseded: SqlBool;
   is_active: SqlBool;
   created_at: string;
 }

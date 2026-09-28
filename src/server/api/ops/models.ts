@@ -15,13 +15,17 @@ export interface ProjectModelView {
   displayName: string;
 }
 
-/** The assistants a project can monitor: active, and not extraction-only. */
+/**
+ * The assistants a project can monitor: active, and not extraction-only.
+ * Current models first, so anything that takes the first match per provider
+ * lands on a current one.
+ */
 export function listModels(db: Driver): ModelRow[] {
   return db
     .prepare(
       `SELECT * FROM models
         WHERE is_active = 1 AND is_extraction_model = 0
-        ORDER BY tier, provider, display_name`,
+        ORDER BY superseded, tier, provider, display_name`,
     )
     .all<ModelRow>();
 }

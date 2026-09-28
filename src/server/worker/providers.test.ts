@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXTRACTION_JSON_SCHEMA, EXTRACTION_SHAPE } from "./extraction";
 import {
+  anthropicAcceptsForcedTools,
   applyLowEffort,
   callExtractionModel,
   callProvider,
+  canForceSearch,
   EXTRACTION_MAX_TOKENS,
   EXTRACTION_PROBE_MAX_TOKENS,
   extractorCheck,
@@ -45,6 +47,13 @@ describe("applyLowEffort", () => {
       model: "claude-sonnet-5",
       output_config: { effort: "low" },
     });
+  });
+
+  it("keeps a structured-output format already in Anthropic's output_config", () => {
+    const format = { type: "json_schema", schema: { type: "object" } };
+    expect(
+      applyLowEffort("anthropic", { model: "claude-opus-5-5", output_config: { format } }),
+    ).toEqual({ model: "claude-opus-5-5", output_config: { format, effort: "low" } });
   });
 
   it("nests it for the OpenAI Responses API, which is the shape with `input`", () => {
@@ -483,6 +492,66 @@ describe("forcing the Anthropic search", () => {
     expect(sentBodies[0]).not.toHaveProperty("tools");
     expect(sentBodies[0]).not.toHaveProperty("tool_choice");
   });
+
+  it("offers the search unforced to a model that rejects forced tool use", async () => {
+    // Claude Opus 5.5 answers tool_choice "tool" with a 400. An answer that
+    // then skips the search is caught by the pass's NO_WEB_SEARCH check.
+    stubResponses({ content: [searched, textBlock], stop_reason: "end_turn", usage: {} });
+    await callProvider({
+      provider: "anthropic",
+      modelId: "claude-opus-5-5",
+      apiKey: "test-key",
+      system: "system",
+      user: "user",
+      jsonMode: false,
+      webSearch: true,
+    });
+    expect(sentBodies[0]).not.toHaveProperty("tool_choice");
+    expect(sentTools()[0]?.["name"]).toBe("web_search");
+  });
+
+  it("enforces a JSON shape with output_config.format on a model that rejects forced tools", async () => {
+    const input = { answer_format: "prose", total_items: 0, brands: [] };
+    stubResponses({
+      content: [
+        { type: "thinking", thinking: "" },
+        { type: "text", text: JSON.stringify(input) },
+      ],
+      stop_reason: "end_turn",
+      usage: {},
+    });
+    const res = await callProvider({
+      provider: "anthropic",
+      modelId: "claude-opus-5-5",
+      apiKey: "test-key",
+      system: "system",
+      user: "user",
+      jsonMode: true,
+      jsonSchema: EXTRACTION_SHAPE,
+    });
+    expect(sentBodies[0]).not.toHaveProperty("tools");
+    expect(sentBodies[0]).not.toHaveProperty("tool_choice");
+    expect(sentBodies[0]?.["output_config"]).toEqual({
+      format: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMA },
+    });
+    expect(JSON.parse(res.text)).toEqual(input);
+  });
+});
+
+describe("canForceSearch", () => {
+  it("is true where the request can force the search, false where it can only offer it", () => {
+    expect(canForceSearch("openai", "gpt-6-sol")).toBe(true);
+    expect(canForceSearch("anthropic", "claude-sonnet-5")).toBe(true);
+    expect(canForceSearch("anthropic", "claude-opus-5")).toBe(true);
+    expect(canForceSearch("anthropic", "claude-opus-5-5")).toBe(false);
+    expect(canForceSearch("google", "gemini-3.8-flash")).toBe(false);
+  });
+
+  it("is false for the Anthropic families that reject forced tools", () => {
+    expect(anthropicAcceptsForcedTools("claude-fable-5-1")).toBe(false);
+    expect(anthropicAcceptsForcedTools("claude-mythos-5-1")).toBe(false);
+    expect(anthropicAcceptsForcedTools("claude-haiku-4-5")).toBe(true);
+  });
 });
 
 describe("assembling an OpenAI answer", () => {
@@ -880,6 +949,15 @@ describe("searchCheck", () => {
     expect(res.status).toBe("ok");
   });
 
+  it("probes a model that rejects forced tools the way its runs ask it: unforced", async () => {
+    stub({
+      content: [{ type: "web_search_tool_result", content: [{ type: "web_search_result" }] }],
+    });
+    const res = await searchCheck("anthropic", "claude-opus-5-5", "test-key");
+    expect(sent).not.toHaveProperty("tool_choice");
+    expect(res.status).toBe("ok");
+  });
+
   it("recognises Anthropic's documented org-disabled error", async () => {
     stub({ error: { type: "invalid_request_error", message: "web search is not enabled" } }, 400);
     const res = await searchCheck("anthropic", "claude-sonnet-5", "test-key");
@@ -959,10 +1037,10 @@ describe("searchCheck", () => {
 });
 
 describe("searchCheckModelId", () => {
-  it("picks the mid tier search-capable model per provider", () => {
-    expect(searchCheckModelId("openai")).toBe("gpt-5.6-terra");
+  it("picks the current mid tier search-capable model per provider, never a superseded one", () => {
+    expect(searchCheckModelId("openai")).toBe("gpt-6-sol");
     expect(searchCheckModelId("anthropic")).toBe("claude-sonnet-5");
-    expect(searchCheckModelId("google")).toBe("gemini-3.6-flash");
+    expect(searchCheckModelId("google")).toBe("gemini-3.8-flash");
   });
 });
 

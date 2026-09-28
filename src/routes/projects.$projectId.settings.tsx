@@ -668,7 +668,7 @@ function ExtractionSection({ projectId }: { projectId: string }) {
       <SectionHeading>Extractor</SectionHeading>
       <p className="text-sm text-muted-foreground">
         A cheap model reads every answer and turns it into structured mentions. Pick one whose
-        provider key you have; the list is ordered cheapest first.
+        provider key you have. Current models come first, cheapest first, and older ones after them.
       </p>
       <div className="panel p-4">
         <Select
@@ -688,6 +688,7 @@ function ExtractionSection({ projectId }: { projectId: string }) {
               return (
                 <SelectItem key={model.id} value={model.id} disabled={locked || held}>
                   {model.display_name}
+                  {model.superseded === 1 ? " · older" : ""}
                   {held
                     ? " (checking your keys…)"
                     : locked

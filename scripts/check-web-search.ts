@@ -4,7 +4,7 @@
  *
  *   npm run check:search                     # every provider with a key
  *   npm run check:search -- openai anthropic # only these providers
- *   npm run check:search -- anthropic:claude-opus-5   # a specific model
+ *   npm run check:search -- anthropic:claude-opus-5-5   # a specific model
  *   OVERHEARD_MOCK_PROVIDERS=1 npm run check:search   # mock providers answer
  *
  * Keys are read from the environment and from ./.env, and never printed. Each
@@ -12,8 +12,8 @@
  * Gemini probes are free inside the paid-tier allowance and fail outright on
  * the free tier, which this script also catches.
  *
- * The Anthropic probe mirrors the run's request shape: the search tool is
- * forced via tool_choice in the direct-caller form.
+ * The Anthropic probe mirrors the run's request shape: the search tool in the
+ * direct-caller form, forced via tool_choice on the models that accept it.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

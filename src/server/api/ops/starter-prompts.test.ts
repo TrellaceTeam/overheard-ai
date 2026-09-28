@@ -129,15 +129,23 @@ describe("generateStarterPrompts", () => {
     expect(generated.costUsd).toBeCloseTo(rows[0]?.cost_usd ?? 0, 10);
   });
 
-  it("calls the cheapest keyed mid-tier model, OpenAI first on the catalogue's exact tie", async () => {
+  it("calls the cheapest keyed current mid-tier model, OpenAI first on an exact tie", async () => {
     const database = open();
     const everyKey = calls(GOOD);
     await generateStarterPrompts(database, REQUEST, {
       providersWithKeys: ALL_KEYS,
       call: everyKey.call,
     });
-    // GPT-5.6 Terra and Gemini 3.6 Flash list at the same prices.
-    expect(everyKey.models[0]?.model_id).toBe("gpt-5.6-terra");
+    // Gemini 3.6 Flash lists at the same price, but it is superseded.
+    expect(everyKey.models[0]?.model_id).toBe("gemini-3.8-flash");
+
+    const tied = calls(GOOD);
+    await generateStarterPrompts(database, REQUEST, {
+      providersWithKeys: ["openai", "anthropic"],
+      call: tied.call,
+    });
+    // GPT-6 Sol and Claude Sonnet 5 list at the same prices.
+    expect(tied.models[0]?.model_id).toBe("gpt-6-sol");
 
     const anthropicOnly = calls(GOOD);
     await generateStarterPrompts(database, REQUEST, {
@@ -155,7 +163,7 @@ describe("generateStarterPrompts", () => {
       providersWithKeys: ["google", "anthropic"],
       call,
     });
-    expect(models[0]?.model_id).toBe("gemini-3.1-flash-lite");
+    expect(models[0]?.model_id).toBe("gemini-3.5-flash-lite");
   });
 
   it("refuses with no key, before any call, and logs nothing", async () => {
@@ -280,11 +288,11 @@ describe("generateStarterPrompts, the rare bad day", () => {
       expect.objectContaining({ kind: "prompt_generation", outcome: "error", input_tokens: 0 }),
     ]);
     // The worst case carries the full output cap at the model's output price.
-    const terra = database
-      .prepare("SELECT output_price_per_mtok FROM models WHERE model_id = 'gpt-5.6-terra'")
+    const sol = database
+      .prepare("SELECT output_price_per_mtok FROM models WHERE model_id = 'gpt-6-sol'")
       .get<{ output_price_per_mtok: number }>();
     expect(rows[0]?.cost_usd).toBeGreaterThan(
-      (GENERATION_MAX_TOKENS / 1e6) * (terra?.output_price_per_mtok ?? 0),
+      (GENERATION_MAX_TOKENS / 1e6) * (sol?.output_price_per_mtok ?? 0),
     );
   });
 

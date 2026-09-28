@@ -10,8 +10,9 @@ import { summarisePerception } from "./perception-extract";
 // An in-memory database through the driver, migrated and seeded. Nothing under
 // ./data is touched.
 
-const SONNET = CATALOGUE[1]!.id;
-const LUNA = CATALOGUE[4]!.id;
+const catalogueId = (modelId: string) => CATALOGUE.find((m) => m.model_id === modelId)!.id;
+const SONNET = catalogueId("claude-sonnet-5");
+const LUNA = catalogueId("gpt-6-luna");
 
 let db: Driver;
 
@@ -353,7 +354,7 @@ describe("summarisePerception", () => {
 
     // Only the assistant that recognised the brand is fed to the merge.
     expect(sawPrompt).toContain("Claude Sonnet 5");
-    expect(sawPrompt).not.toContain("GPT-5.6 Luna");
+    expect(sawPrompt).not.toContain("GPT-6 Luna");
     const merged = db
       .prepare(
         "SELECT knows_brand, what_it_does, source_answers FROM perception_summaries WHERE model_id IS NULL",

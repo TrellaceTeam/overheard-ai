@@ -100,6 +100,7 @@ const ANSWER_MODEL: ModelRow = {
   search_price_per_call: 0.01,
   is_extraction_model: 0,
   extraction_rank: null,
+  superseded: 0,
   is_active: 1,
   created_at: "2026-01-01T00:00:00.000Z",
 };
@@ -529,6 +530,29 @@ describe("Gemini retry pressure", () => {
     });
   });
 
+  it("tells a model that cannot be forced to search to search, in the system prompt", async () => {
+    (callProvider as Mock).mockResolvedValue(providerResult("text"));
+    claimOnce([geminiClaimed()]);
+
+    await runWorkerPass(db);
+
+    const sent = (callProvider as Mock).mock.calls[0]?.[0] as { system: string; user: string };
+    expect(sent.system).toMatch(/Search the web before you answer\.$/);
+    expect(sent.user).toBe("Which analytics tool should a mid-market team buy?");
+  });
+
+  it("leaves the system prompt alone for a model whose search is forced", async () => {
+    process.env["ANTHROPIC_API_KEY"] = "sk-ant-test-key";
+    (getModel as Mock).mockReturnValue(ANSWER_MODEL);
+    (callProvider as Mock).mockResolvedValue(providerResult("text"));
+    claimOnce([claimed()]);
+
+    await runWorkerPass(db);
+
+    const sent = (callProvider as Mock).mock.calls[0]?.[0] as { system: string };
+    expect(sent.system).not.toContain("Search the web before you answer.");
+  });
+
   it("asks a first attempt with the question verbatim", async () => {
     (callProvider as Mock).mockResolvedValue(providerResult("text"));
     claimOnce([geminiClaimed()]);
@@ -596,7 +620,30 @@ describe("Gemini retry pressure", () => {
     });
   });
 
-  it("never pressures Anthropic, whose wire already forces the search", async () => {
+  it("pressures an Anthropic model that rejects forced tools, naming its own tool", async () => {
+    (callProvider as Mock).mockResolvedValue(providerResult("text"));
+    claimOnce([
+      claimed({
+        task: task({
+          attempts: 2,
+          error: "NO_WEB_SEARCH: the assistant answered without searching the web",
+        }),
+        providerModelId: "claude-opus-5-5",
+      }),
+    ]);
+
+    await runWorkerPass(db);
+
+    expect(callProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "anthropic",
+        modelId: "claude-opus-5-5",
+        user: "You must use the web search tool before answering.\n\nWhich analytics tool should a mid-market team buy?",
+      }),
+    );
+  });
+
+  it("never pressures an Anthropic model whose wire already forces the search", async () => {
     (callProvider as Mock).mockResolvedValue(providerResult("text"));
     claimOnce([
       claimed({

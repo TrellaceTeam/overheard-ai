@@ -50,7 +50,7 @@ tables:
 
 | Table | What it holds |
 | --- | --- |
-| `models` | The assistant catalogue: provider, model id, tier, prices, whether it can search, and which models can be used as extractors. Seeded and refreshed on every boot, except `is_active`, which belongs to the user. |
+| `models` | The assistant catalogue: provider, model id, tier, prices, whether it can search, which models can be used as extractors, and which a newer model has `superseded`. A superseded model stays callable for the projects that ask it and is never preselected. Seeded and refreshed on every boot, except `is_active`, which belongs to the user. |
 | `projects` | One brand being tracked, with the optional brand description from setup, which nothing reads back. Several projects share a file, plus at most one built-in demo project (ADR 0006), flagged and generated, never run. |
 | `app_state` | One row of install-wide facts: the tutorial state, the run size limit (`max_planned_calls`) and each provider's calls in flight (`max_inflight_<provider>`, null for the default). |
 | `brands` | The target brand and its competitors, with name variants and domains. |
@@ -171,7 +171,8 @@ Every answer costs two provider calls, and they are different kinds of call.
 The app chooses the extractor, cheapest first, among the providers you have a key for. The
 extraction request carries the JSON shape it must be answered in, enforced the provider's own
 way: OpenAI strict structured outputs, a Gemini response schema, an Anthropic forced tool
-use. The setup check's extractor probe sends the same shape, so a passing check predicts a
+use, or Anthropic structured output on a model that rejects forced tools. The setup check's
+extractor probe sends the same shape, so a passing check predicts a
 passing run. A model that still returns the wrong shape sends the same stored answer up the
 extraction ladder inside the one claim: the same provider's next tier up, then the cheapest
 keyed extractor, two escalations at most, each billed and logged like any extraction call.

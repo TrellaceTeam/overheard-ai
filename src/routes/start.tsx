@@ -74,35 +74,30 @@ export const Route = createFileRoute("/start")({
   component: Start,
 });
 
+type DefaultCandidate = { id: string; provider: string; tier: string; superseded?: number };
+
 /**
- * One assistant per provider with a key, mid tier. An extraction-tier model is
- * cheap at reading an answer back, not at writing the answer a first
- * impression rests on.
+ * One assistant per provider with a key: the current mid-tier model. An
+ * extraction-tier model is cheap at reading an answer back, not at writing the
+ * answer a first impression rests on, and a superseded one is kept only for
+ * the projects already asking it.
  */
 export function defaultAssistantIds(
-  models: ReadonlyArray<{ id: string; provider: string; tier: string }>,
+  models: ReadonlyArray<DefaultCandidate>,
   keyedProviders: readonly string[],
 ): string[] {
-  const perProvider = new Map<string, string>();
-  for (const model of models) {
-    if (model.tier !== "mid") continue;
-    if (!keyedProviders.includes(model.provider)) continue;
-    if (!perProvider.has(model.provider)) perProvider.set(model.provider, model.id);
-  }
-  return [...perProvider.values()];
+  return oneMidPerProvider(models.filter((model) => keyedProviders.includes(model.provider)));
 }
 
 /**
- * The tutorial's selection: one mid-tier model per provider, whatever keys
- * exist. The demo never calls them, and greying out providers with no key
+ * The tutorial's selection: one current mid-tier model per provider, whatever
+ * keys exist. The demo never calls them, and greying out providers with no key
  * would teach the wrong lesson about what the grid does.
  */
-export function oneMidPerProvider(
-  models: ReadonlyArray<{ id: string; provider: string; tier: string }>,
-): string[] {
+export function oneMidPerProvider(models: ReadonlyArray<DefaultCandidate>): string[] {
   const perProvider = new Map<string, string>();
   for (const model of models) {
-    if (model.tier !== "mid") continue;
+    if (model.tier !== "mid" || model.superseded === 1) continue;
     if (!perProvider.has(model.provider)) perProvider.set(model.provider, model.id);
   }
   return [...perProvider.values()];

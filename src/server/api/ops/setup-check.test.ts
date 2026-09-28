@@ -36,8 +36,8 @@ describe("checkProviders", () => {
     const report = await checkProviders(["openai", "google"], probe);
 
     expect(seen).toEqual([
-      ["openai", "gpt-5.6-terra"],
-      ["google", "gemini-3.6-flash"],
+      ["openai", "gpt-6-sol"],
+      ["google", "gemini-3.8-flash"],
     ]);
     expect(report.rows).toHaveLength(2);
     expect(report.rows.every((row) => row.kind === "assistant")).toBe(true);
@@ -57,7 +57,8 @@ describe("checkProviders", () => {
 });
 
 describe("checkSelection", () => {
-  const GPT_LUNA = "e473c6ad-df52-4ee6-bf96-f7913077f8d1";
+  // A superseded extractor: named explicitly, it is still the one probed.
+  const GPT_5_6_LUNA = "e473c6ad-df52-4ee6-bf96-f7913077f8d1";
   const SONNET = "8e4393f7-aaaf-415f-b52c-fec4b4166501";
 
   it("probes the named assistants plus the extractor createProject would auto-pick", async () => {
@@ -73,7 +74,7 @@ describe("checkSelection", () => {
 
     expect(seen).toEqual([
       ["assistant", "claude-sonnet-5"],
-      ["extractor", "gpt-5.6-luna"],
+      ["extractor", "gpt-6-luna"],
     ]);
     expect(report.rows.map((row) => row.kind)).toEqual(["assistant", "extractor"]);
   });
@@ -81,7 +82,7 @@ describe("checkSelection", () => {
   it("honours an explicitly named extractor and an explicit null", async () => {
     const named = await checkSelection(
       db,
-      { assistantModelIds: [SONNET], extractorModelId: GPT_LUNA },
+      { assistantModelIds: [SONNET], extractorModelId: GPT_5_6_LUNA },
       async () => ok(),
     );
     expect(named.rows.map((row) => row.kind)).toEqual(["assistant", "extractor"]);

@@ -352,8 +352,11 @@ export function applyLowEffort(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
   switch (provider) {
-    case "anthropic":
-      return { ...body, output_config: { effort: LOW_EFFORT } };
+    case "anthropic": {
+      // Merged, so a structured-output format in the same block survives.
+      const outputConfig = (body["output_config"] ?? {}) as Record<string, unknown>;
+      return { ...body, output_config: { ...outputConfig, effort: LOW_EFFORT } };
+    }
     case "openai":
       // The Responses API nests it. Chat Completions takes it flat.
       return "input" in body
@@ -496,14 +499,36 @@ function fromChatCompletion(json: unknown, searchCalls = 0): ProviderResult {
 const ANTHROPIC_FORCED_SEARCH = { type: "tool", name: "web_search" } as const;
 
 /**
+ * Whether an Anthropic model accepts a forced tool_choice. Claude Opus 5.5 and
+ * the Fable and Mythos models answer tool_choice "tool" or "any" with a 400.
+ * They are offered the search tool unforced, and a JSON shape is enforced with
+ * output_config.format instead of a forced tool.
+ */
+export function anthropicAcceptsForcedTools(modelId: string): boolean {
+  return !/claude-(opus-5-5|fable|mythos)/.test(modelId);
+}
+
+/**
+ * Whether the request can force a web search: OpenAI's tool_choice "required",
+ * and Anthropic's forced tool on the models that accept one. Gemini's grounding
+ * tool has no force mode. A model that cannot be forced can skip the search,
+ * so a retry after NO_WEB_SEARCH presses it in words (see pass.ts).
+ */
+export function canForceSearch(provider: string, modelId: string): boolean {
+  if (provider === "openai") return true;
+  if (provider === "anthropic") return anthropicAcceptsForcedTools(modelId);
+  return false;
+}
+
+/**
  * The web search tool version depends on the model generation.
  *
  * `allowed_callers: ["direct"]` makes the tool forcible: web_search_20260209
  * defaults to calls through code execution, and tool_choice rejects a tool
  * that does not allow direct calls. Models without programmatic tool calling
  * also reject a forced search without it. The cost is no dynamic filtering,
- * so more input tokens per answer. Forcing is worth it because a model offered
- * the tool can skip it and answer from memory.
+ * so more input tokens per answer. Forcing, on the models that accept it, is
+ * worth it because a model offered the tool can skip it and answer from memory.
  */
 function anthropicSearchTool(modelId: string) {
   const modern = /claude-(sonnet-5|opus-5|haiku-4-5)/.test(modelId);
@@ -730,14 +755,15 @@ export async function callProvider({
           system,
           messages,
         };
+        const forcible = anthropicAcceptsForcedTools(modelId);
         if (webSearch) {
           body["tools"] = [anthropicSearchTool(modelId)];
           // Forced on the first turn only. A resume continues a conversation
           // whose search already ran, and forcing there would pay for another
           // search on every resume and risk a pause loop.
-          if (turn === 0) body["tool_choice"] = { ...ANTHROPIC_FORCED_SEARCH };
+          if (turn === 0 && forcible) body["tool_choice"] = { ...ANTHROPIC_FORCED_SEARCH };
         }
-        if (jsonSchema && !webSearch) {
+        if (jsonSchema && !webSearch && forcible) {
           // Forced tool use is Anthropic's shape enforcement: the schema is
           // the tool's input schema and tool_choice leaves the model no other
           // move. The JSON arrives as that tool_use block's input.
@@ -751,6 +777,10 @@ export async function callProvider({
             },
           ];
           body["tool_choice"] = { type: "tool", name: jsonSchema.name };
+        } else if (jsonSchema && !webSearch) {
+          // Structured output for a model that rejects forced tools. The JSON
+          // arrives as the reply's text block.
+          body["output_config"] = { format: { type: "json_schema", schema: jsonSchema.schema } };
         }
         const json = (await postWithLowEffort(
           provider,
@@ -1054,10 +1084,13 @@ export async function searchCheck(
           model: modelId,
           max_tokens: SEARCH_CHECK_MAX_TOKENS,
           messages: [{ role: "user", content: SEARCH_CHECK_PROMPT }],
-          // max_uses 1: the probe needs one search. The forced tool_choice and
-          // the direct-caller form mirror the run's request.
+          // max_uses 1: the probe needs one search. The forced tool_choice, on
+          // the models that accept it, and the direct-caller form mirror the
+          // run's request.
           tools: [{ ...anthropicSearchTool(modelId), max_uses: 1 }],
-          tool_choice: { ...ANTHROPIC_FORCED_SEARCH },
+          ...(anthropicAcceptsForcedTools(modelId)
+            ? { tool_choice: { ...ANTHROPIC_FORCED_SEARCH } }
+            : {}),
         };
         const json = (await post(
           "https://api.anthropic.com/v1/messages",
@@ -1116,13 +1149,13 @@ export async function searchCheck(
 }
 
 /**
- * The catalogue's mid-tier search-capable model for a provider: what the
- * diagnostics script probes when no model is named. Frontier models cost more
- * per search-check and extraction models cannot search at all.
+ * The catalogue's current mid-tier search-capable model for a provider: what
+ * the diagnostics script probes when no model is named. Frontier models cost
+ * more per search-check and extraction models cannot search at all.
  */
 export function searchCheckModelId(provider: Provider): string | null {
   const candidates = CATALOGUE.filter(
-    (model) => model.provider === provider && model.supports_web_search,
+    (model) => model.provider === provider && model.supports_web_search && !model.superseded,
   );
   return (candidates.find((model) => model.tier === "mid") ?? candidates[0])?.model_id ?? null;
 }

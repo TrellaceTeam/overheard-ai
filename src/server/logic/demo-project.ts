@@ -56,8 +56,8 @@ export const DEMO_JUMP_WEEK = 15;
 export const DEMO_ITERATIONS = 3;
 
 /** The assistants the demo "asked", by catalog model_id (resolved to ids at run time). */
-const DEMO_ASSISTANT_MODELS = ["claude-sonnet-5", "gpt-5.6-terra", "gemini-3.6-flash"];
-const DEMO_EXTRACTOR_MODEL = "gpt-5.6-luna";
+const DEMO_ASSISTANT_MODELS = ["claude-sonnet-5", "gpt-6-sol", "gemini-3.8-flash"];
+const DEMO_EXTRACTOR_MODEL = "gpt-6-luna";
 
 /**
  * The prompts. One names the brand, so the dashboard's exclusion of

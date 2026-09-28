@@ -19,14 +19,42 @@ function models(): ModelRow[] {
   return db.prepare("SELECT * FROM models ORDER BY provider, model_id").all<ModelRow>();
 }
 
+const CATALOGUE_SIZE = CATALOGUE.length;
+
+function current(rows: ModelRow[]): ModelRow[] {
+  return rows.filter((r) => r.superseded === 0);
+}
+
 describe("seedModels", () => {
-  it("writes the nine live catalog rows, three per provider", () => {
+  it("writes three current models per provider, plus the ones they replaced", () => {
     seedModels(db);
     const rows = models();
 
-    expect(rows).toHaveLength(9);
+    expect(rows).toHaveLength(CATALOGUE_SIZE);
     for (const provider of ["anthropic", "google", "openai"]) {
-      expect(rows.filter((r) => r.provider === provider)).toHaveLength(3);
+      expect(current(rows).filter((r) => r.provider === provider)).toHaveLength(3);
+    }
+    expect(
+      rows
+        .filter((r) => r.superseded === 1)
+        .map((r) => r.model_id)
+        .sort(),
+    ).toEqual(
+      [
+        "claude-opus-5",
+        "gemini-3.1-flash-lite",
+        "gemini-3.6-flash",
+        "gpt-5.6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+      ].sort(),
+    );
+  });
+
+  it("keeps a replaced model active, so the projects asking it keep asking it", () => {
+    seedModels(db);
+    for (const row of models().filter((r) => r.superseded === 1)) {
+      expect(row.is_active, row.model_id).toBe(1);
     }
   });
 
@@ -37,9 +65,9 @@ describe("seedModels", () => {
     expect(ids).not.toContain("gemini-3.1-pro");
   });
 
-  it("gives every provider exactly one extraction model, ranked cheapest first", () => {
+  it("gives every provider exactly one current extraction model, ranked cheapest first", () => {
     seedModels(db);
-    const extractors = models().filter((r) => r.is_extraction_model === 1);
+    const extractors = current(models()).filter((r) => r.is_extraction_model === 1);
 
     expect(extractors).toHaveLength(3);
     expect(new Set(extractors.map((r) => r.provider)).size).toBe(3);
@@ -47,16 +75,20 @@ describe("seedModels", () => {
       [...extractors]
         .sort((a, b) => (a.extraction_rank ?? 0) - (b.extraction_rank ?? 0))
         .map((r) => r.model_id),
-    ).toEqual(["gpt-5.6-luna", "gemini-3.1-flash-lite", "claude-haiku-4-5"]);
+    ).toEqual(["gpt-6-luna", "gemini-3.5-flash-lite", "claude-haiku-4-5"]);
   });
 
-  it("ranks extractors in the same order their input price does", () => {
+  it("ranks current extractors by input price, and every replaced one after them", () => {
     seedModels(db);
     const extractors = models()
       .filter((r) => r.is_extraction_model === 1)
       .sort((a, b) => (a.extraction_rank ?? 0) - (b.extraction_rank ?? 0));
-    const prices = extractors.map((r) => r.input_price_per_mtok);
-    expect(prices).toEqual([...prices].sort((a, b) => a - b));
+    const currentPrices = extractors
+      .filter((r) => r.superseded === 0)
+      .map((r) => r.input_price_per_mtok);
+    expect(currentPrices).toEqual([...currentPrices].sort((a, b) => a - b));
+    const firstReplaced = extractors.findIndex((r) => r.superseded === 1);
+    expect(extractors.slice(firstReplaced).every((r) => r.superseded === 1)).toBe(true);
   });
 
   it("leaves extraction_rank null on a model that cannot extract", () => {
@@ -66,11 +98,12 @@ describe("seedModels", () => {
     }
   });
 
-  it("marks web search on exactly the six non-extraction models", () => {
+  it("marks web search on every model that is not an extractor, and on no extractor", () => {
     seedModels(db);
-    const searchers = models().filter((r) => r.supports_web_search === 1);
-    expect(searchers).toHaveLength(6);
-    expect(searchers.every((r) => r.is_extraction_model === 0)).toBe(true);
+    for (const row of models()) {
+      expect(row.supports_web_search, row.model_id).toBe(row.is_extraction_model === 1 ? 0 : 1);
+    }
+    expect(current(models()).filter((r) => r.supports_web_search === 1)).toHaveLength(6);
   });
 
   it("re-seeds without duplicating rows and refreshes catalog facts", () => {
@@ -82,7 +115,7 @@ describe("seedModels", () => {
 
     seedModels(db);
 
-    expect(models()).toHaveLength(9);
+    expect(models()).toHaveLength(CATALOGUE_SIZE);
     expect(models().find((r) => r.model_id === "claude-opus-5")?.display_name).toBe(
       "Claude Opus 5",
     );
@@ -113,7 +146,7 @@ describe("seedModels", () => {
     const after = models().filter((r) => r.model_id === "gpt-5.6-luna");
     expect(after).toHaveLength(1);
     expect(after[0]?.id).toBe(before?.id);
-    expect(models()).toHaveLength(9);
+    expect(models()).toHaveLength(CATALOGUE_SIZE);
   });
 
   it("keeps the catalog ids stable across boots", () => {

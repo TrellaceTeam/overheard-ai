@@ -70,6 +70,7 @@ import {
   ANSWER_MAX_TOKENS,
   callExtractionModel,
   callProvider,
+  canForceSearch,
   EXTRACTION_MAX_TOKENS,
   MAX_SEARCHES,
   ProviderError,
@@ -116,12 +117,25 @@ const ANSWER_SYSTEM =
   "You are a helpful assistant answering a buyer's question. Recommend specific products or companies by name, as you normally would. Cite the sources you use: when a claim comes from a web page you found, include that page's URL next to the claim.";
 
 /**
- * Gemini's grounding tool has no force mode, so a skipped search can only be
- * pushed for in words. Prepended to the question on a retry after
- * NO_WEB_SEARCH, never on a first attempt, which asks the question the way a
- * buyer would.
+ * Added to the system prompt for a model the request cannot force to search.
+ * Offered the tool without force, Claude Opus 5.5 and Gemini 3.8 Flash skip it
+ * on many buyer questions, and each skipped search is a billed answer thrown
+ * away. The question itself still goes in as the buyer would ask it.
  */
-const GEMINI_SEARCH_PRESSURE = "You must use the Google Search tool before answering.";
+const SEARCH_INSTRUCTION = "Search the web before you answer.";
+
+/**
+ * A model the request cannot force to search (Gemini, and the Anthropic models
+ * that reject forced tool use) can only be pushed in words. Beyond
+ * SEARCH_INSTRUCTION, this is prepended to the question on a retry after
+ * NO_WEB_SEARCH, never on a first attempt, which asks the question the way a
+ * buyer would. Each names the tool the model was given.
+ */
+function searchPressure(provider: Provider): string {
+  return provider === "google"
+    ? "You must use the Google Search tool before answering."
+    : "You must use the web search tool before answering.";
+}
 
 export interface WorkerPassOptions {
   /** Checked only between batches, so a pass can outlive it by one call. */
@@ -382,9 +396,10 @@ async function answerPhase(db: Driver, claimed: ClaimedTask, ctx: PassContext): 
   // The claimed row carries this phase's last failure reason, so only a retry
   // after a skipped search gets the pressure. A timeout retry asks the plain
   // question again. classifyFailure is the same reading the failure card uses.
+  const forcible = canForceSearch(provider, providerModelId);
   const user =
-    provider === "google" && classifyFailure(toStoredFailure(task)).key === "no-web-search"
-      ? `${GEMINI_SEARCH_PRESSURE}\n\n${question}`
+    !forcible && classifyFailure(toStoredFailure(task)).key === "no-web-search"
+      ? `${searchPressure(provider)}\n\n${question}`
       : question;
 
   const model = ctx.model(task.model_id);
@@ -405,7 +420,8 @@ async function answerPhase(db: Driver, claimed: ClaimedTask, ctx: PassContext): 
       provider,
       modelId: providerModelId,
       apiKey: key,
-      system: ANSWER_SYSTEM,
+      system:
+        forcible || !supportsWebSearch ? ANSWER_SYSTEM : `${ANSWER_SYSTEM} ${SEARCH_INSTRUCTION}`,
       user,
       jsonMode: false,
       // Every answer is asked to search. An answer from the model's training
