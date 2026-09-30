@@ -40,6 +40,9 @@ cp .env.example .env        # then paste at least one API key into .env
 npm run dev
 ```
 
+In Windows PowerShell, type `npm.cmd` wherever this page says `npm`. PowerShell's default
+execution policy refuses to run `npm`.
+
 Open http://127.0.0.1:3000.
 
 No key yet? Start it anyway. The first launch walks you through a demo project with six months of
@@ -51,11 +54,12 @@ Paste this into Claude Code, Codex, Cursor or any agent that can run a terminal:
 
 ```text
 Set up Overheard AI (https://github.com/TrellaceTeam/overheard-ai) on this machine.
+In Windows PowerShell, run npm.cmd wherever these steps say npm.
 1. Run `node --version`. If it is older than 22.13, stop and tell me.
 2. git clone https://github.com/TrellaceTeam/overheard-ai.git, then cd overheard-ai
 3. npm install
 4. Copy .env.example to .env. Leave every key empty: I will add mine myself.
-5. Run `npm run dev` and tell me the address it prints.
+5. Start `npm run dev` in the background, since it keeps running. Tell me the address it prints.
 Never write an API key into a file, a command or a message. If a step fails, show me the
 error and stop.
 ```
