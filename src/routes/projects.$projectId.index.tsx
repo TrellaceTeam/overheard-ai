@@ -40,6 +40,7 @@ import { PerceptionBand } from "@/components/PerceptionBand";
 import { RunPlanSummary, planWithEstimate } from "@/components/RunPlanSummary";
 import { useRunEstimate } from "@/components/useRunEstimate";
 import { StatusPill } from "@/components/StatusPill";
+import { TrellaceCredit } from "@/components/TrellaceCredit";
 import type { ComparePoint, NamedSummary, PerceptionSummary } from "@/components/types";
 import {
   applyFilter,
@@ -923,7 +924,9 @@ function Dashboard() {
 
       {showAttribution && (
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span>Built by Trellace. Overheard AI is open source and runs on your machine.</span>
+          <span>
+            <TrellaceCredit />. Overheard AI is open source and runs on your machine.
+          </span>
           <button
             type="button"
             aria-label="Dismiss"

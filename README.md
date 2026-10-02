@@ -224,6 +224,22 @@ switcher, a diagnostics page, OpenRouter support and report sharing.
 Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, the
 four checks CI runs, and the one rule about test data: fictional brands only.
 
+## From Trellace
+
+[Trellace][trellace] works with B2B founders in the messy middle, after product-market fit and
+before a repeatable go-to-market team. That's usually $1 million to $10 million in annual
+revenue. We publish the methods and tools we use because GTM needs more open source projects.
+
+- **Founders.** If you'd like help reading what the assistants say about you, or deciding what
+  to change, [book a 30-minute GTM Sparring Session][contact].
+- **Investors.** Most of our work starts with an introduction from a fund. If a company you
+  back comes to mind, [make an introduction][contact].
+- **More free tools.** See everything we've published at
+  [github.com/TrellaceTeam](https://github.com/TrellaceTeam).
+
+[trellace]: https://www.trellace.com/?utm_source=github&utm_medium=readme&utm_campaign=overheard-ai
+[contact]: https://www.trellace.com/contact?utm_source=github&utm_medium=readme&utm_campaign=overheard-ai
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
