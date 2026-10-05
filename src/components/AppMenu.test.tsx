@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeAll, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { AppMenu, FOOTER_CREDIT } from "./AppMenu";
+import { AppMenu } from "./AppMenu";
 import { TOUR_SELECTORS } from "./TutorialTour";
 import { installDomStubs } from "./test-helpers";
 
@@ -67,10 +67,16 @@ describe("AppMenu", () => {
     expect(screen.queryByText(/Delete account/)).toBeNull();
   });
 
-  it("credits the maintainer in the footer", () => {
+  it("credits the maintainer in the footer, linking to its site in a new tab", () => {
     render(<AppMenu projects={[]} loading={false} />);
     openMenu();
-    expect(screen.getByText(FOOTER_CREDIT)).toBeDefined();
+    const link = screen.getByRole("link", { name: "Trellace" });
+    expect(link.parentElement?.textContent).toBe("Built by Trellace");
+    expect(link.getAttribute("href")).toBe(
+      "https://www.trellace.com/?utm_source=overheard-ai&utm_medium=app",
+    );
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     expect(screen.getByText("No projects yet.")).toBeDefined();
   });
 });

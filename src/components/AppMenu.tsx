@@ -3,14 +3,9 @@ import { Check, Loader2, Menu, Plus, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { AppLink } from "@/components/AppLink";
+import { TrellaceCredit } from "@/components/TrellaceCredit";
 import { TOUR_SELECTORS, useTour } from "@/components/TutorialTour";
 import type { ProjectSummary } from "@/components/types";
-
-/**
- * Maintainer credit in the menu footer. Exported so the test reads it from here
- * and a grep for the text finds the component that renders it.
- */
-export const FOOTER_CREDIT = "Built by Trellace";
 
 /**
  * The navigation drawer: the project switcher, the way in to a new project, and
@@ -112,7 +107,9 @@ export function AppMenu({
             <Settings className="size-4" />
             Account settings
           </AppLink>
-          <p className="px-2 pt-1 text-xs text-muted-foreground">{FOOTER_CREDIT}</p>
+          <p className="px-2 pt-1 text-xs text-muted-foreground">
+            <TrellaceCredit />
+          </p>
         </div>
       </SheetContent>
     </Sheet>
