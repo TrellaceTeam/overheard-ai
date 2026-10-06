@@ -182,6 +182,12 @@ fails fails the task: with `EXTRACTION_TRUNCATED` when every reader ran out of t
 "The model that reads answers ran out of room", and with `EXTRACTION_UNREADABLE` otherwise,
 shown as "We could not read this answer". Retry on either walks the ladder again.
 
+In subscription mode, both calls for that provider go through its own command line tool
+instead of its API: one fresh `claude -p` or `codex exec` process per call, in an empty
+temporary folder, signed in with the user's plan. The switch is inside `callProvider`, so the
+two phases, the ladder and the retries do not change.
+[ADR 0007](decisions/0007-subscription-mode.md) has the details.
+
 Perception tasks use the same two phases with different prompts: the answer is read into
 four sections instead of mined for brands, and a database trigger refuses any brand
 observation written against a perception task. A perception answer names the brand's
@@ -206,8 +212,10 @@ One pass is: reap, claim, call, persist, finalise.
   candidate whose provider is at its cap. Account settings saves a cap per provider in
   `app_state`, from 1 to 15 because no batch could reach more, and each pass reads it, so a
   change needs no restart. A valid `OVERHEARD_MAX_INFLIGHT_<PROVIDER>` wins over the saved
-  cap, and the saved cap over the default (`worker/concurrency.ts`). A cap set too high costs
-  429s and backoff, never money, because providers do not bill a rejected request. Google
+  cap, and the saved cap over the default (`worker/concurrency.ts`). A provider in
+  subscription mode defaults to 3, because each of its calls is a whole process. A cap set
+  too high costs 429s and backoff, never money, because providers do not bill a rejected
+  request. Google
   publishes no numeric rates, so its 3 is a judgement call.
 - **Claiming is one write transaction** opened with `BEGIN IMMEDIATE`: select, status
   change, lock stamp and attempt increment together. SQLite has no `FOR UPDATE SKIP LOCKED`,

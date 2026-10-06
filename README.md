@@ -126,6 +126,51 @@ models your key can use, and the setup screen will not tick one it cannot.
 `.env.example` lists the other settings: the database path, the port, and how many calls each
 provider may have in flight.
 
+### Subscription mode: a Claude or ChatGPT plan instead of a key (beta)
+
+If you have a Claude or ChatGPT plan, Overheard AI can ask through the command line tool you
+already sign in to: Claude Code for Anthropic, Codex for OpenAI. Calls then count against
+your plan's usage limits instead of a bill.
+
+1. Install [Claude Code](https://code.claude.com/docs/en/setup) or
+   [Codex](https://developers.openai.com/codex/cli), and sign in with your plan:
+   `claude auth login`, or `codex login` with "Sign in with ChatGPT".
+2. Add the command to `.env`. Use its full path if the app runs where the command isn't on
+   your PATH, such as a scheduled task.
+
+   ```sh
+   OVERHEARD_ANTHROPIC_CLI=claude
+   OVERHEARD_OPENAI_CLI=codex
+   ```
+
+3. Account settings now shows "via claude, on your Claude plan". Its Check button makes one
+   real call with web search through the tool.
+
+What changes:
+
+- Each call starts the tool once, in an empty temporary folder. Your own settings,
+  instructions, memory, skills and plugins are switched off, and web search is the only tool.
+  API key variables are removed from the tool's environment, so a call can't bill a key by
+  accident.
+- Spend shows $0. Calls count against your plan's limits instead, which neither company
+  publishes. When a plan hits its limit, the run page says so on the calls that failed. Retry
+  them once it resets. A provider in subscription mode starts at 3
+  calls in flight.
+- The models are the same, but each tool searches its own way. In testing, Claude Code ran one
+  or two searches per answer, where the API path allows up to five. Codex sends its own agent
+  instructions along with yours, plus your `~/.codex/AGENTS.md` if you keep one. Account
+  settings warns about that file. A trend that mixes API runs and plan runs compares two
+  slightly different measurements.
+- Google has no subscription mode yet.
+- Plans are sized for one person's own use, and both companies recommend API keys for
+  automated work. Read [Anthropic's](https://code.claude.com/docs/en/legal-and-compliance) and
+  [OpenAI's](https://developers.openai.com/codex/auth) terms for your plan before you turn this
+  on. Use API keys to measure brands for anyone else.
+- Tested with Claude Code 2.1.284 and Codex 0.160.1. If an older tool refuses a flag, update
+  it.
+
+[ADR 0007](docs/decisions/0007-subscription-mode.md) records why it works this way.
+
 ## What a run costs
 
 Each answer takes two calls. One asks the prompt. The other, to a cheaper extraction model,
@@ -166,7 +211,8 @@ pay for the same answers twice.
   framed.
 - Keys stay on the server. They never reach the browser, the database or a log, and the app
   never writes to `.env`.
-- The only outbound traffic goes to the providers you have keys for.
+- The only outbound traffic goes to the providers you have keys for, or through the
+  command line tools you set for subscription mode.
 - There is no login. Anyone who can reach the port can read every answer and spend your keys,
   so don't put it on a public address.
 

@@ -92,7 +92,8 @@ What it fabricates, and how that stays visible:
 - Server logic tests open an in-memory database (`openDatabase(":memory:")`), migrate it,
   and assert on rows. They do not mock the database.
 - Provider calls are never made in a test. The offline seam in
-  `src/server/worker/mock-provider.ts` is the seam to use.
+  `src/server/worker/mock-provider.ts` is the seam to use. Subscription mode's tests start a
+  stand-in script in place of `claude` or `codex`, never the real tool.
 - A test that asserts on wording asserts on the wording a user sees, not on a class name.
 - Prefer one test that fails for one reason over a test that asserts on a whole object.
 
