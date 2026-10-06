@@ -63,6 +63,15 @@ and both are built to run non-interactively (`claude -p`, `codex exec`).
   answer in testing, where the API path allows five. Codex adds its own agent instructions, which no
   setting removes, and the user's `~/.codex/AGENTS.md` when one exists. Account settings warns
   about that file. A trend that mixes API runs and plan runs mixes two measurements.
+- The tools tell the model about the person running them, and neither has a setting that
+  stops it. Claude Code adds the signed-in account's email to every conversation. Both add
+  the date, the operating system and the working folder, whose path holds the user name, and
+  Codex adds the time zone. A request logged with `OTEL_LOG_RAW_API_BODIES` shows Claude's
+  exactly. The email can tilt answers in the user's own category. The README suggests signing
+  the tool in with a separate account whose email doesn't name the company. Both tools keep a
+  second sign-in apart when `CLAUDE_CONFIG_DIR` or `CODEX_HOME` points at another folder,
+  and Overheard passes those variables through. The API path sends only the app's
+  instructions and the question.
 - Plan limits replace dollars, and neither company publishes them.
 - Each tool's flags and output can change between versions. The parsers are lenient and
   tested against recorded output, and the setup check names a refused flag in its detail.

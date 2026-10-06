@@ -40,6 +40,9 @@ cp .env.example .env        # then paste at least one API key into .env
 npm run dev
 ```
 
+No API key, but a Claude or ChatGPT plan? See
+[subscription mode](#subscription-mode-a-claude-or-chatgpt-plan-instead-of-a-key-beta).
+
 In Windows PowerShell, type `npm.cmd` wherever this page says `npm`. PowerShell's default
 execution policy refuses to run `npm`.
 
@@ -152,6 +155,12 @@ What changes:
   instructions, memory, skills and plugins are switched off, and web search is the only tool.
   API key variables are removed from the tool's environment, so a call can't bill a key by
   accident.
+- Each tool still tells the model a little about you, and no setting turns it off. Claude
+  Code adds the email of the account you signed in with. Both add the date, your operating
+  system and a folder path that contains your user name, and Codex adds your time zone. The
+  email can tilt answers in your own category, because its domain names your company. To
+  avoid that, sign the tool in with a separate account whose email doesn't name your
+  company. With an API key, the model gets only the app's instructions and the question.
 - Spend shows $0. Calls count against your plan's limits instead, which neither company
   publishes. When a plan hits its limit, the run page says so on the calls that failed. Retry
   them once it resets. A provider in subscription mode starts at 3
@@ -256,6 +265,8 @@ picked. `npm run test:bun` runs the tests under Bun.
   which is close to what people see in ChatGPT, Claude or Gemini, but not the same.
 - Gemini and Claude Opus 5.5 can't be forced to search, so they are told to. An answer with
   no search is retried, then counted as failed, and you still pay for the call.
+- In subscription mode, Claude Code tells the model the email you signed in with, which can
+  tilt answers in your own category. A separate account with a neutral email avoids it.
 - Stopping the app mid-run can repeat up to 15 calls, the ones in flight when it stopped.
 - Node 22 and 24 print `ExperimentalWarning: SQLite is an experimental feature` at boot. It is
   harmless. Node 25 and Bun don't print it.
