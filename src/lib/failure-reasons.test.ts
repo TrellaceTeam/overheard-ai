@@ -300,7 +300,7 @@ describe("classifyFailure, coded rows", () => {
         reason.key === "unknown" && reason.title === "We could not classify this failure";
       if (deliberateDefaults.has(base)) {
         expect(isDefault, base).toBe(true);
-      } else if (base === "MISSING_CREDENTIAL" || base === "HTTP") {
+      } else if (["MISSING_CREDENTIAL", "HTTP", "CLI_SIGN_IN", "PLAN_LIMIT"].includes(base)) {
         // Param-bearing: the bare base defaults, the param form does not.
         expect(isDefault, base).toBe(true);
       } else {
@@ -312,6 +312,31 @@ describe("classifyFailure, coded rows", () => {
       classifyFailure({ code: failureCode("MISSING_CREDENTIAL", "openai"), error: null }).owner,
     ).toBe("you");
     expect(classifyFailure({ code: failureCode("HTTP", 401), error: null }).owner).toBe("you");
+  });
+
+  it("tells a subscription-mode user to sign the command in, not to fix a key", () => {
+    const reason = classifyFailure({
+      code: failureCode("CLI_SIGN_IN", "anthropic"),
+      error: "CLI_SIGN_IN: Not logged in · Please run /login",
+    });
+    expect(reason.owner).toBe("you");
+    expect(reason.title).toBe("The claude command is not ready");
+    expect(reason.advice).toContain("run claude auth login in a terminal");
+    expect(reason.advice).toContain("OVERHEARD_ANTHROPIC_CLI");
+  });
+
+  it("names the plan that reached its usage limit", () => {
+    const reason = classifyFailure({
+      code: failureCode("PLAN_LIMIT", "openai"),
+      error: "PLAN_LIMIT: You've hit your usage limit.",
+    });
+    expect(reason.owner).toBe("provider");
+    expect(reason.title).toBe("Your ChatGPT plan reached its usage limit");
+  });
+
+  it("gives a subscription-mode code for a provider without a command the default card", () => {
+    const reason = classifyFailure({ code: failureCode("CLI_SIGN_IN", "google"), error: null });
+    expect(reason.title).toBe("We could not classify this failure");
   });
 
   it("classifies a coded row with an empty detail like the coded row", () => {

@@ -14,7 +14,7 @@ import { getDb } from "./db/client";
 import { databasePathFromEnv, type Driver } from "./db/driver";
 import { bootRecovery } from "./logic/recovery";
 import { watchEnvFile } from "./worker/env-file";
-import { configuredProviders } from "./worker/keys";
+import { configuredProviders, PROVIDERS, providerCli } from "./worker/keys";
 import { mockProvidersEnabled } from "./worker/mock-provider";
 import { startWorker, stopWorker, workerStatus, WORKER_ID } from "./worker/loop";
 import { startScheduler, schedulerStatus, stopScheduler } from "./worker/scheduler-loop";
@@ -27,6 +27,8 @@ export interface BootSummary {
   /** Tasks the previous process left locked, returned to a claimable status. */
   recovered: { requeued: number; returnedToAnswered: number; exhausted: number };
   providers: string[];
+  /** The providers asked through a command line tool in subscription mode. */
+  cliProviders: string[];
   mockProviders: boolean;
   /** Which timers this process is running, read back after starting. */
   loops: { worker: boolean; scheduler: boolean };
@@ -75,6 +77,7 @@ export function boot(options: BootOptions = {}): BootSummary {
     driverModule: db.driverModule,
     recovered,
     providers: configuredProviders(),
+    cliProviders: PROVIDERS.filter((provider) => providerCli(provider) !== null),
     mockProviders: mockProvidersEnabled(),
     // Read back from the loops, not assumed from startLoops, so the log line
     // reports what is running.
@@ -90,6 +93,7 @@ export function boot(options: BootOptions = {}): BootSummary {
         `worker=${summary.workerId} providers=${summary.providers.join(",") || "none"} ` +
         `loops=${loopLabel(summary.loops)}` +
         (summary.mockProviders ? " mock-providers=on" : "") +
+        (summary.cliProviders.length > 0 ? ` subscription=${summary.cliProviders.join(",")}` : "") +
         ` recovered=${recovered.requeued}/${recovered.returnedToAnswered}/${recovered.exhausted}`,
     );
   }

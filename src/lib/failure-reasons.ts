@@ -17,7 +17,7 @@
  * user broke something.
  */
 
-import { keyEnvNamesSafe } from "./provider-keys";
+import { isCliProvider, keyEnvNamesSafe, PROVIDER_CLI } from "./provider-keys";
 import { parseFailureCode, type ParsedFailureCode, type StoredFailure } from "./failure-codes";
 
 /**
@@ -83,6 +83,29 @@ function missingCredentialCard(slug: string): Card {
     owner: "you",
     title: `No ${provider} API key configured`,
     advice: `Add ${keyEnvNamesSafe(slug.toLowerCase()) ?? `your ${provider} key`} to the .env file in the app's folder, then run again. There is no need to restart. The template, .env.example, lists every variable name.`,
+  };
+}
+
+/** Null for a slug with no subscription-mode route, which then wears the default card. */
+function cliSignInCard(slug: string): Card | null {
+  if (!isCliProvider(slug)) return null;
+  const cli = PROVIDER_CLI[slug];
+  return {
+    key: `cli-sign-in:${slug}`,
+    owner: "you",
+    title: `The ${cli.command} command is not ready`,
+    advice: `Subscription mode asks ${providerLabel(slug)} through ${cli.tool}, signed in with your ${cli.plan} plan. Check it is installed, then run ${cli.signIn} in a terminal and retry the failed calls. If it is installed outside your PATH, set ${cli.env} in .env to its full path. The technical detail below says what went wrong.`,
+  };
+}
+
+function planLimitCard(slug: string): Card | null {
+  if (!isCliProvider(slug)) return null;
+  const cli = PROVIDER_CLI[slug];
+  return {
+    key: `plan-limit:${slug}`,
+    owner: "provider",
+    title: `Your ${cli.plan} plan reached its usage limit`,
+    advice: `Subscription mode counts every call against your ${cli.plan} plan, which allows a set amount of use in each window of a few hours. Retry the failed calls once it resets, or lower this provider's calls in flight in Account settings.`,
   };
 }
 
@@ -273,6 +296,10 @@ function classifyCode(parsed: ParsedFailureCode): Card | null {
       return cancelledCard();
     case "MISSING_CREDENTIAL":
       return parsed.param ? missingCredentialCard(parsed.param) : null;
+    case "CLI_SIGN_IN":
+      return parsed.param ? cliSignInCard(parsed.param) : null;
+    case "PLAN_LIMIT":
+      return parsed.param ? planLimitCard(parsed.param) : null;
     case "NO_EXTRACTION_CREDENTIAL":
       return noExtractionCredentialCard();
     case "EMPTY_ANSWER":

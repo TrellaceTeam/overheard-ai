@@ -23,6 +23,7 @@ export type AvailabilityView =
   | { status: "ok"; available: string[]; missing: string[] }
   | { status: "no_key" }
   | { status: "mocked" }
+  | { status: "cli" }
   | { status: "error"; message: string };
 
 export interface MenuItem {

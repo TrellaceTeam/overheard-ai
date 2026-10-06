@@ -11,7 +11,7 @@
 import { createHash } from "node:crypto";
 import type { Driver } from "../../db/driver";
 import type { Provider } from "../../db/types";
-import { PROVIDERS, resolveProviderKey } from "../../worker/keys";
+import { PROVIDERS, providerCli, resolveProviderKey } from "../../worker/keys";
 import { mockProvidersEnabled } from "../../worker/mock-provider";
 import { listedModel, listKeyModels } from "../../worker/model-list";
 import { ProviderError } from "../../worker/providers";
@@ -21,6 +21,8 @@ export type ProviderAvailability =
   | { status: "ok"; available: string[]; missing: string[] }
   | { status: "no_key" }
   | { status: "mocked" }
+  /** Subscription mode. A plan has no model list to read, so every model is offered. */
+  | { status: "cli" }
   | { status: "error"; message: string };
 
 export type AvailabilityReport = Record<Provider, ProviderAvailability>;
@@ -100,6 +102,7 @@ export async function modelAvailability(
   const entries = await Promise.all(
     PROVIDERS.map(async (provider): Promise<[Provider, ProviderAvailability]> => {
       if (mockProvidersEnabled()) return [provider, { status: "mocked" }];
+      if (providerCli(provider)) return [provider, { status: "cli" }];
       const apiKey = resolveProviderKey(provider);
       if (!apiKey) return [provider, { status: "no_key" }];
       const listed = await listFor(provider, apiKey, options.force === true, options.fetchImpl);

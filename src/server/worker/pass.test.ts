@@ -1239,6 +1239,19 @@ describe("costOf", () => {
     expect(cost).toBe(1);
   });
 
+  it("prices a call on a plan at nothing, because the plan bills per month, not per call", () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = "claude";
+    try {
+      const planModel = { ...(model as object), provider: "anthropic" } as never;
+      expect(costOf(planModel, { inputTokens: 1_000_000, outputTokens: 0, searchCalls: 1 })).toBe(
+        0,
+      );
+      expect(worstCaseCost(planModel, "answer")).toBe(0);
+    } finally {
+      delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+    }
+  });
+
   it("prices a mock call at nothing, because the seam bills nothing", () => {
     // The usage row is still written. Only the money is zero.
     process.env["OVERHEARD_MOCK_PROVIDERS"] = "1";

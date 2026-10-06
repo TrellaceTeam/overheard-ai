@@ -9,8 +9,14 @@
  * Only resolveProviderKey and providerKeyValues return key values, for the
  * adapters and the error scrubber. Nothing here logs or renders one.
  * keyStatus() is all the Settings and Start screens see.
+ *
+ * A provider in subscription mode needs no key: its variable names the
+ * command line tool it is asked through, and that tool signs in with the
+ * user's plan. Precedence is the mock seam, then subscription mode, then a key.
  */
 import type { Provider } from "../db/types";
+import { isCliProvider, PROVIDER_CLI, type CliProvider } from "@/lib/provider-keys";
+import { cliProblem } from "./cli-command";
 import { refreshEnvKeys } from "./env-file";
 import { mockProvidersEnabled } from "./mock-provider";
 
@@ -30,6 +36,37 @@ export const PROVIDERS: readonly Provider[] = ["openai", "anthropic", "google"];
  * adapter short-circuits before any request is built.
  */
 export const MOCK_KEY = "mock-mode-no-key-required";
+
+/**
+ * The same kind of placeholder for a provider in subscription mode. callProvider
+ * hands the call to the provider's command before any request is built, and
+ * the command signs in on its own.
+ */
+export const CLI_KEY = "subscription-mode-no-key-required";
+
+/** A provider in subscription mode and the command it is asked through. */
+export interface CliTarget {
+  provider: CliProvider;
+  /** A command name found on PATH, or a path to the program. */
+  command: string;
+}
+
+/**
+ * The command a provider is asked through, or null when it is asked through
+ * its API. Read at call time, like a key, so a line added to .env applies
+ * without a restart.
+ */
+export function providerCli(provider: string): CliTarget | null {
+  if (!isCliProvider(provider)) return null;
+  refreshEnvKeys();
+  const command = process.env[PROVIDER_CLI[provider].env]?.trim();
+  return command ? { provider, command } : null;
+}
+
+/** Whether calls to this provider cost the install nothing: the offline seam, or a plan. */
+export function billsNothing(provider: string): boolean {
+  return mockProvidersEnabled() || providerCli(provider) !== null;
+}
 
 /**
  * Accepts only printable ASCII without spaces (0x21-0x7E).
@@ -66,6 +103,7 @@ export const UNUSABLE_KEY_MESSAGE =
 /** The key for one provider, or null when there is none this process can send. */
 export function resolveProviderKey(provider: Provider): string | null {
   if (mockProvidersEnabled()) return MOCK_KEY;
+  if (providerCli(provider)) return CLI_KEY;
   const value = envKey(provider);
   if (value === null) return null;
   return isHeaderSafe(value) ? value : null;
@@ -116,12 +154,16 @@ export interface ProviderKeyStatus {
   configured: boolean;
   /**
    * Why it can. "env" is a usable key in the environment, "mock" is the
-   * offline seam answering whether or not a key exists, "none" is neither.
-   * Without it, `configured` would read as "key found" under the mock seam on
-   * a machine with no keys.
+   * offline seam answering whether or not a key exists, "cli" is subscription
+   * mode, "none" is none of them. Without it, `configured` would read as "key
+   * found" under the mock seam on a machine with no keys.
    */
-  source: "env" | "mock" | "none";
-  /** A fixed sentence when a key is present but unusable. Never the value. */
+  source: "env" | "mock" | "cli" | "none";
+  /**
+   * A fixed sentence when a key is present but unusable, or when a
+   * subscription-mode command cannot be started or will not answer cleanly.
+   * Never a key value.
+   */
   problem: string | null;
 }
 
@@ -137,6 +179,15 @@ export function keyStatus(): ProviderKeyStatus[] {
     const usable = value !== null && isHeaderSafe(value);
     const problem = value !== null && !usable ? UNUSABLE_KEY_MESSAGE : null;
     if (mocked) return { provider, configured: true, source: "mock" as const, problem };
+    const cli = providerCli(provider);
+    if (cli) {
+      return {
+        provider,
+        configured: true,
+        source: "cli" as const,
+        problem: cliProblem(cli.provider, cli.command),
+      };
+    }
     return {
       provider,
       configured: usable,

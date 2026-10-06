@@ -18,7 +18,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { searchCheck, searchCheckModelId } from "../src/server/worker/providers";
-import { PROVIDERS, PROVIDER_KEY_ENV } from "../src/server/worker/keys";
+import { PROVIDERS, PROVIDER_KEY_ENV, providerCli } from "../src/server/worker/keys";
 import { mockProvidersEnabled } from "../src/server/worker/mock-provider";
 import type { Provider } from "../src/server/db/types";
 import type { SearchCheckResult } from "../src/lib/setup-check";
@@ -46,7 +46,7 @@ function loadDotEnv(): void {
  * with no key is skipped.
  */
 function hasKey(provider: Provider): boolean {
-  if (mockProvidersEnabled()) return true;
+  if (mockProvidersEnabled() || providerCli(provider)) return true;
   return PROVIDER_KEY_ENV[provider].some((name) => (process.env[name] ?? "").trim() !== "");
 }
 

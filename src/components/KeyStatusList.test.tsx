@@ -94,6 +94,19 @@ describe("KeyStatusList", () => {
     expect(screen.queryByText("key found")).toBeNull();
   });
 
+  it("names the command and the plan when a provider is in subscription mode", () => {
+    render(
+      <KeyStatusList
+        statuses={[
+          { provider: "anthropic", configured: true, source: "cli", result: { state: "untested" } },
+        ]}
+        onCheck={() => {}}
+      />,
+    );
+    expect(screen.getByText("via claude, on your Claude plan")).toBeDefined();
+    expect(screen.queryByText("key found")).toBeNull();
+  });
+
   it("names the current models a key can use and the ones it cannot", () => {
     render(
       <KeyStatusList

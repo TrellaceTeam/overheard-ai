@@ -8,7 +8,7 @@
 // the web search tool page, Gemini API errors). Where a shape is not
 // documented, the mapping is marked and needs confirming against a real key.
 
-import { keyEnvNames } from "./provider-keys";
+import { type CliProvider, keyEnvNames, PROVIDER_CLI } from "./provider-keys";
 import type { Provider } from "@/server/db/types";
 
 export type SearchCheckStatus =
@@ -323,6 +323,36 @@ export function searchFailed(provider: Provider, code: string): SearchCheckResul
 
 export function searchOk(provider: Provider): SearchCheckResult {
   return result(provider, "ok", "Web search works with this key and model.");
+}
+
+/** Subscription mode: the search ran through the provider's command, on the user's plan. */
+export function planSearchOk(provider: CliProvider): SearchCheckResult {
+  const cli = PROVIDER_CLI[provider];
+  return {
+    status: "ok",
+    message: `Web search works through ${cli.command} on your ${cli.plan} plan.`,
+  };
+}
+
+/** Subscription mode: the command could not be started, or is not signed in. */
+export function cliNotReady(provider: CliProvider, detail: string): SearchCheckResult {
+  const cli = PROVIDER_CLI[provider];
+  return {
+    status: "invalid_key",
+    message: `The ${cli.command} command could not answer with your ${cli.plan} plan.`,
+    hint: `Check ${cli.tool} is installed, then run ${cli.signIn} in a terminal and check again.`,
+    detail,
+  };
+}
+
+/** Subscription mode: the user's plan is at its usage limit. */
+export function planLimited(provider: CliProvider, detail: string): SearchCheckResult {
+  return {
+    status: "rate_limited",
+    message: `Your ${PROVIDER_CLI[provider].plan} plan is at its usage limit.`,
+    hint: "Plans allow a set amount of use in each window of a few hours. Check again once it resets.",
+    detail,
+  };
 }
 
 /** The extractor answers a plain call: no search involved, so no search claim. */

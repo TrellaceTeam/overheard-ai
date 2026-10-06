@@ -49,7 +49,7 @@ import {
   extractionLadder as buildExtractionLadder,
   walkExtractionLadder,
 } from "./extraction-ladder";
-import { resolveProviderKey } from "./keys";
+import { billsNothing, resolveProviderKey } from "./keys";
 import { resolveExtractionModel } from "./extractor";
 import { classifyFailure } from "@/lib/failure-reasons";
 import {
@@ -153,10 +153,11 @@ export interface WorkerPassResult {
 
 /**
  * Catalogue prices times reported usage. A mock call costs nothing, since the
- * seam bills nothing, but its usage row is still written.
+ * seam bills nothing, and neither does a call on a plan in subscription mode,
+ * but its usage row is still written.
  */
 export function costOf(model: ModelRow | undefined, r: ProviderUsage): number {
-  if (!model || mockProvidersEnabled()) return 0;
+  if (!model || billsNothing(model.provider)) return 0;
   return (
     ((r.inputTokens ?? 0) / 1_000_000) * Number(model.input_price_per_mtok) +
     ((r.outputTokens ?? 0) / 1_000_000) * Number(model.output_price_per_mtok) +
@@ -174,7 +175,7 @@ export function costOf(model: ModelRow | undefined, r: ProviderUsage): number {
  * count is a floor.
  */
 export function worstCaseCost(model: ModelRow | undefined, kind: "answer" | "extraction"): number {
-  if (!model || mockProvidersEnabled()) return 0;
+  if (!model || billsNothing(model.provider)) return 0;
   const inputTokens = kind === "answer" ? 1_500 : 4_000;
   const outputTokens = kind === "answer" ? ANSWER_MAX_TOKENS : EXTRACTION_MAX_TOKENS;
   const searches = kind === "answer" ? MAX_SEARCHES : 0;

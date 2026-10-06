@@ -11,10 +11,9 @@ import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { databasePathFromEnv, type Driver } from "../../db/driver";
 import type { Provider } from "../../db/types";
-import { DEFAULT_PROVIDER_CAPS } from "../../logic/claim-tasks";
 import { effectiveCallLimit } from "../../logic/plan-run";
 import { CALL_LIMIT_MAX, CALL_LIMIT_MIN, DEFAULT_MAX_PLANNED_CALLS } from "../../logic/types";
-import { effectiveCaps, envCap, INFLIGHT_CAP_ENV } from "../../worker/concurrency";
+import { defaultCap, effectiveCaps, envCap, INFLIGHT_CAP_ENV } from "../../worker/concurrency";
 import { keyStatus, type ProviderKeyStatus } from "../../worker/keys";
 import { mockProvidersEnabled } from "../../worker/mock-provider";
 import { workerStatus, type StartWorkerOptions } from "../../worker/loop";
@@ -165,7 +164,7 @@ export function inflightCaps(db: Driver): InflightCapView[] {
   return (Object.keys(CAP_COLUMN) as Provider[]).map((provider) => ({
     provider,
     effective: effective[provider],
-    defaultCap: DEFAULT_PROVIDER_CAPS[provider],
+    defaultCap: defaultCap(provider),
     stored: stored[provider],
     envName: INFLIGHT_CAP_ENV[provider],
     envOverrides: envCap(provider) !== null,

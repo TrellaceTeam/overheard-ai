@@ -1,10 +1,15 @@
 // Provider adapters for OpenAI, Anthropic and Google, and the setup-check
 // probes. API keys come from ./keys, which reads the user's own environment.
+// A provider in subscription mode is asked through its own command line tool
+// instead (./cli-provider).
 import type { Provider } from "../db/types";
 import { CATALOGUE } from "../db/seed-models";
 import {
   classifySearchFailure,
+  cliNotReady,
   extractorOk,
+  planLimited,
+  planSearchOk,
   searchFailed,
   searchMocked,
   searchNoKey,
@@ -13,8 +18,15 @@ import {
   type SearchCheckResult,
 } from "@/lib/setup-check";
 import { classifyFailure } from "@/lib/failure-reasons";
-import { failureCode, type FailureCode, type StoredFailure } from "@/lib/failure-codes";
-import { providerKeyValues, resolveProviderKey } from "./keys";
+import {
+  failureCode,
+  failureCodeBase,
+  type FailureCode,
+  type StoredFailure,
+} from "@/lib/failure-codes";
+import { isCliProvider } from "@/lib/provider-keys";
+import { callCli, type CliFailure } from "./cli-provider";
+import { type CliTarget, providerCli, providerKeyValues, resolveProviderKey } from "./keys";
 import {
   EXTRACTION_SHAPE,
   EXTRACTION_SYSTEM,
@@ -515,6 +527,8 @@ export function anthropicAcceptsForcedTools(modelId: string): boolean {
  * so a retry after NO_WEB_SEARCH presses it in words (see pass.ts).
  */
 export function canForceSearch(provider: string, modelId: string): boolean {
+  // Neither command line tool takes a forced tool choice.
+  if (providerCli(provider)) return false;
   if (provider === "openai") return true;
   if (provider === "anthropic") return anthropicAcceptsForcedTools(modelId);
   return false;
@@ -654,6 +668,20 @@ export async function callProvider({
   // call. See mock-provider.ts.
   if (mockProvidersEnabled()) {
     return mockCallProvider({ provider, modelId, system, user, jsonMode });
+  }
+  // Checked before any request is built too, so subscription mode never sends
+  // the placeholder key anywhere.
+  const cli = providerCli(provider);
+  if (cli) {
+    return callThroughCli(cli, {
+      modelId,
+      system,
+      user,
+      jsonMode,
+      jsonSchema,
+      webSearch,
+      timeoutMs,
+    });
   }
   // One deadline for the whole logical call.
   const deadlineAt = Date.now() + timeoutMs;
@@ -914,6 +942,67 @@ export async function callProvider({
   }
 }
 
+/**
+ * A subscription-mode failure as the ProviderError the worker records. A
+ * missing or signed-out tool cannot fix itself, so it is not retried. A plan
+ * at its limit is retried with the worker's backoff, like a 429.
+ */
+function cliProviderError(provider: Provider, failure: CliFailure): ProviderError {
+  const message = scrubError(failure.message);
+  switch (failure.kind) {
+    case "sign_in":
+      return new ProviderError(
+        `CLI_SIGN_IN: ${message}`,
+        401,
+        failureCode("CLI_SIGN_IN", provider),
+      );
+    case "plan_limit":
+      return new ProviderError(`PLAN_LIMIT: ${message}`, 429, failureCode("PLAN_LIMIT", provider));
+    case "timeout":
+      return new ProviderError(`TIMEOUT ${message}`, 0, "TIMEOUT");
+    case "refused":
+      return new ProviderError(
+        `HTTP ${failure.status}: ${message}`,
+        failure.status,
+        failureCode("HTTP", failure.status),
+      );
+    case "failed":
+      return new ProviderError(`CLI_FAILED: ${message}`, 0, "UNEXPECTED");
+  }
+}
+
+async function callThroughCli(
+  target: CliTarget,
+  call: {
+    modelId: string;
+    system: string;
+    user: string;
+    jsonMode: boolean;
+    jsonSchema: EnforcedShape | undefined;
+    webSearch: boolean;
+    timeoutMs: number;
+  },
+): Promise<ProviderResult> {
+  const outcome = await callCli({ target, ...call });
+  if (outcome.ok) return outcome.result;
+  throw cliProviderError(target.provider, outcome.failure);
+}
+
+/**
+ * A probe's failure as a verdict. Subscription mode's own two failures get
+ * sentences about the command and the plan, and everything else the
+ * provider's API wording.
+ */
+function probeVerdict(provider: Provider, err: unknown): SearchCheckResult {
+  const raw = (err as { status?: unknown } | null)?.status;
+  const status = typeof raw === "number" ? raw : 0;
+  const message = scrubError((err as Error | null)?.message ?? "");
+  const base = err instanceof ProviderError ? failureCodeBase(err.code) : null;
+  if (isCliProvider(provider) && base === "CLI_SIGN_IN") return cliNotReady(provider, message);
+  if (isCliProvider(provider) && base === "PLAN_LIMIT") return planLimited(provider, message);
+  return classifySearchFailure(provider, status, message);
+}
+
 /** Injected so the extractor probe's orchestration is unit-testable with no network. */
 export type ProviderPing = (
   provider: Provider,
@@ -1011,10 +1100,7 @@ export async function extractorCheck(
     await doPing(provider, modelId, apiKey);
     return extractorOk();
   } catch (err) {
-    const raw = (err as { status?: unknown }).status;
-    const status = typeof raw === "number" ? raw : 0;
-    const message = (err as Error)?.message ?? "";
-    return classifySearchFailure(provider, status, scrubError(message));
+    return probeVerdict(provider, err);
   }
 }
 
@@ -1045,7 +1131,9 @@ const SEARCH_CHECK_MAX_TOKENS = 1024;
  * Evidence per provider: OpenAI a `web_search_call` item with status
  * "completed", Anthropic a `web_search_tool_result` block or billed searches
  * in usage unless every search failed, Google
- * `groundingMetadata.webSearchQueries`.
+ * `groundingMetadata.webSearchQueries`. In subscription mode the probe is a
+ * run answer's own call through the command, and the evidence is the search
+ * count the command's output shows (see cli-provider.ts).
  */
 export async function searchCheck(
   provider: Provider,
@@ -1053,6 +1141,25 @@ export async function searchCheck(
   apiKey?: string | undefined,
 ): Promise<SearchCheckResult> {
   if (mockProvidersEnabled()) return searchMocked();
+  const cli = providerCli(provider);
+  if (cli) {
+    try {
+      const res = await callThroughCli(cli, {
+        modelId,
+        system: "Search the web before you answer.",
+        user: SEARCH_CHECK_PROMPT,
+        jsonMode: false,
+        jsonSchema: undefined,
+        webSearch: true,
+        timeoutMs: TIMEOUT_MS,
+      });
+      return res.searchCalls > 0
+        ? planSearchOk(cli.provider)
+        : searchNotPerformed(provider, { answerSnippet: scrubError(res.text).slice(0, 140) });
+    } catch (err) {
+      return probeVerdict(provider, err);
+    }
+  }
   const key = apiKey ?? resolveProviderKey(provider);
   if (!key) return searchNoKey(provider);
 

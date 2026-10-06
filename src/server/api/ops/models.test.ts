@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Driver } from "../../db/driver";
 import { freshDb, HAIKU, seedProject, SONNET } from "../../logic/test-support";
-import { listExtractionModels, listModels, listProjectModels, setProjectModel } from "./models";
+import {
+  listExtractionModels,
+  listModels,
+  listProjectModels,
+  pricedForThisInstall,
+  setProjectModel,
+} from "./models";
 
 const GPT_6_LUNA = "f7473ade-c43e-49b3-9db5-00bbfb2b3d00";
 const GEMINI_3_5_FLASH_LITE = "f970f5ef-4809-4181-8c17-c1cb75eef4e2";
@@ -20,6 +26,23 @@ function open(): Driver {
   seedProject(db, { models: [SONNET] });
   return db;
 }
+
+describe("pricedForThisInstall", () => {
+  afterEach(() => {
+    delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+  });
+
+  it("prices a provider in subscription mode at nothing and leaves a keyed one at list", () => {
+    const db = open();
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = "claude";
+    const listed = listModels(db);
+    const rows = pricedForThisInstall(listed);
+    const sonnet = rows.find((model) => model.id === SONNET);
+    expect([sonnet?.input_price_per_mtok, sonnet?.search_price_per_call]).toEqual([0, 0]);
+    const keyed = listed.findIndex((model) => model.provider === "openai");
+    expect(rows[keyed]).toBe(listed[keyed]);
+  });
+});
 
 describe("listModels", () => {
   it("offers the assistants a project can monitor and leaves the extractors out", () => {

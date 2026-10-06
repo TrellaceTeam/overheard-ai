@@ -19,6 +19,13 @@ export const FAILURE_CODES = [
   "MAX_ATTEMPTS_EXCEEDED",
   /** No API key for the provider the call needs. Param: provider slug. */
   "MISSING_CREDENTIAL",
+  /**
+   * Subscription mode: the provider's command could not be started, or is not
+   * signed in. Param: provider slug.
+   */
+  "CLI_SIGN_IN",
+  /** Subscription mode: the user's plan is at its usage limit. Param: provider slug. */
+  "PLAN_LIMIT",
   /** A model names a provider this build has no adapter for. Param: provider slug. */
   "UNSUPPORTED_PROVIDER",
   /** No key for any model that can read answers. */

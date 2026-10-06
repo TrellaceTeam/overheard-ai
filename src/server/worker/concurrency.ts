@@ -11,6 +11,19 @@
 import type { Provider } from "../db/types";
 import { DEFAULT_PROVIDER_CAPS } from "../logic/claim-tasks";
 import { isInflightCap } from "@/lib/inflight-caps";
+import { providerCli } from "./keys";
+
+/**
+ * The default for a provider in subscription mode. Each call there is a whole
+ * process of the provider's command line tool, and the plan behind it is the
+ * same one the user works on, so it starts lower than an API key's default.
+ */
+export const CLI_DEFAULT_CAP = 3;
+
+/** What applies when neither the variable nor Account settings sets a cap. */
+export function defaultCap(provider: Provider): number {
+  return providerCli(provider) ? CLI_DEFAULT_CAP : DEFAULT_PROVIDER_CAPS[provider];
+}
 
 export const INFLIGHT_CAP_ENV: Record<Provider, string> = {
   openai: "OVERHEARD_MAX_INFLIGHT_OPENAI",
@@ -46,6 +59,7 @@ export function effectiveCaps(
     const fromEnv = envCap(provider, env);
     if (fromEnv !== null) caps[provider] = fromEnv;
     else if (saved !== null && isInflightCap(saved)) caps[provider] = saved;
+    else caps[provider] = defaultCap(provider);
   }
   return caps;
 }

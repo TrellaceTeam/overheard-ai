@@ -2,9 +2,10 @@
  * Provider keys re-read from the .env file while the app runs, so a key added
  * after start is picked up without a restart.
  *
- * Only the provider key variables are re-read. DATABASE_PATH, PORT and the mock
- * seam stay as they were at start: changing them under a running process would
- * move it to another database or port mid-run.
+ * Only the provider key variables and the subscription-mode command variables
+ * are re-read. DATABASE_PATH, PORT and the mock seam stay as they were at
+ * start: changing them under a running process would move it to another
+ * database or port mid-run.
  *
  * A shell variable keeps winning. Whatever loaded .env at start (Vite, Bun,
  * Node's --env-file) left a shell value in place, so a key that differs from
@@ -15,7 +16,7 @@
  * src/server.ts, so a developer's real .env never reaches them.
  */
 import { readFileSync, statSync } from "node:fs";
-import { PROVIDER_KEY_ENV } from "@/lib/provider-keys";
+import { PROVIDER_CLI, PROVIDER_KEY_ENV } from "@/lib/provider-keys";
 
 interface EnvFileState {
   path: string;
@@ -32,7 +33,10 @@ const STATE_KEY = Symbol.for("overheard.envFile");
 type EnvFileGlobal = typeof globalThis & { [STATE_KEY]?: EnvFileState };
 
 function keyVariables(): string[] {
-  return Object.values(PROVIDER_KEY_ENV).flat();
+  return [
+    ...Object.values(PROVIDER_KEY_ENV).flat(),
+    ...Object.values(PROVIDER_CLI).map((cli) => cli.env),
+  ];
 }
 
 /**

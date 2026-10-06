@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  billsNothing,
+  CLI_KEY,
   configuredProviders,
   hasAnyProviderKey,
   keyStatus,
+  providerCli,
   providerKeyValues,
   resolveProviderKey,
   UNUSABLE_KEY_MESSAGE,
@@ -14,6 +17,8 @@ const VARS = [
   "GOOGLE_API_KEY",
   "GEMINI_API_KEY",
   "OVERHEARD_MOCK_PROVIDERS",
+  "OVERHEARD_ANTHROPIC_CLI",
+  "OVERHEARD_OPENAI_CLI",
 ];
 
 function clear() {
@@ -127,5 +132,43 @@ describe("keyStatus", () => {
   it("ignores a value too short to be a key, so a message is not shredded", () => {
     process.env["OPENAI_API_KEY"] = "x";
     expect(providerKeyValues()).toEqual([]);
+  });
+});
+
+describe("subscription mode", () => {
+  it("asks a provider through the command its variable names, ahead of its key", () => {
+    process.env["ANTHROPIC_API_KEY"] = "sk-ant-anthropic";
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = "  claude ";
+    expect(providerCli("anthropic")).toEqual({ provider: "anthropic", command: "claude" });
+    expect(resolveProviderKey("anthropic")).toBe(CLI_KEY);
+    expect(configuredProviders()).toEqual(["anthropic"]);
+  });
+
+  it("has no route for a provider without a command line tool", () => {
+    expect(providerCli("google")).toBeNull();
+  });
+
+  it("counts a plan's calls as costing nothing, and a key's as billed", () => {
+    process.env["OVERHEARD_OPENAI_CLI"] = "codex";
+    expect(billsNothing("openai")).toBe(true);
+    expect(billsNothing("anthropic")).toBe(false);
+  });
+
+  it("says which command answers, and why it cannot when it is missing", () => {
+    process.env["OVERHEARD_OPENAI_CLI"] = "overheard-no-such-command";
+    expect(keyStatus().find((s) => s.provider === "openai")).toEqual({
+      provider: "openai",
+      configured: true,
+      source: "cli",
+      problem:
+        'Overheard AI cannot find "overheard-no-such-command". Install Codex and sign in to it, or set OVERHEARD_OPENAI_CLI to the command\'s full path.',
+    });
+  });
+
+  it("leaves the mock seam in charge when both are on", () => {
+    process.env["OVERHEARD_MOCK_PROVIDERS"] = "1";
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = "claude";
+    expect(keyStatus().find((s) => s.provider === "anthropic")?.source).toBe("mock");
+    expect(resolveProviderKey("anthropic")).not.toBe(CLI_KEY);
   });
 });

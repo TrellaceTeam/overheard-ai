@@ -22,7 +22,7 @@
 import type { Driver } from "../../db/driver";
 import type { ModelRow } from "../../db/types";
 import { recordUsageEvent } from "../../logic/usage";
-import { mockProvidersEnabled } from "../../worker/mock-provider";
+import { billsNothing } from "../../worker/keys";
 import { costOf, mayHaveBilled } from "../../worker/pass";
 import {
   callExtractionModel,
@@ -121,7 +121,7 @@ export function generationFailureReason(provider: string, error: unknown): strin
  * cost.
  */
 function worstCaseGenerationCost(model: ModelRow, sentChars: number): number {
-  if (mockProvidersEnabled()) return 0;
+  if (billsNothing(model.provider)) return 0;
   return (
     (Math.ceil(sentChars / 4) / 1_000_000) * Number(model.input_price_per_mtok) +
     (GENERATION_MAX_TOKENS / 1_000_000) * Number(model.output_price_per_mtok)

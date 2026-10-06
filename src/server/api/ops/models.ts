@@ -7,7 +7,22 @@
  */
 import type { Driver } from "../../db/driver";
 import type { ModelRow } from "../../db/types";
+import { providerCli } from "../../worker/keys";
 import { NotFoundError, refuseDemoProject } from "./shared";
+
+/**
+ * The catalogue rows as this install pays for them. A provider in
+ * subscription mode costs nothing per call, so its rows go to the browser
+ * priced at zero, and every estimate built from them agrees with the spend the
+ * worker logs (costOf in worker/pass.ts).
+ */
+export function pricedForThisInstall(rows: ModelRow[]): ModelRow[] {
+  return rows.map((row) =>
+    providerCli(row.provider)
+      ? { ...row, input_price_per_mtok: 0, output_price_per_mtok: 0, search_price_per_call: 0 }
+      : row,
+  );
+}
 
 export interface ProjectModelView {
   modelId: string;

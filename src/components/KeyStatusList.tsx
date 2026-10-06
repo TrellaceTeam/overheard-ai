@@ -2,8 +2,23 @@ import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AvailabilityView } from "@/lib/assistant-menu";
 import { providerLabel } from "@/lib/failure-reasons";
-import { keyEnvNamesSafe, PROVIDER_KEY_PAGES } from "@/lib/provider-keys";
+import {
+  isCliProvider,
+  keyEnvNamesSafe,
+  PROVIDER_CLI,
+  PROVIDER_KEY_PAGES,
+} from "@/lib/provider-keys";
 import type { KeyStatus, ProviderSlug } from "@/components/types";
+
+/** What stands behind a configured row. */
+function sourceLabel(status: KeyStatus): string {
+  if (status.source === "mock") return "mock provider";
+  if (status.source === "cli" && isCliProvider(status.provider)) {
+    const cli = PROVIDER_CLI[status.provider];
+    return `via ${cli.command}, on your ${cli.plan} plan`;
+  }
+  return "key found";
+}
 
 /**
  * The provider key panel on the settings screens.
@@ -18,8 +33,9 @@ import type { KeyStatus, ProviderSlug } from "@/components/types";
  * on every read, so that costs nothing and needs no restart.
  *
  * With OVERHEARD_MOCK_PROVIDERS=1 the offline seam answers for every provider,
- * so `configured` is true with no key anywhere. `source` tells the row which of
- * the two it is.
+ * so `configured` is true with no key anywhere. In subscription mode a
+ * provider's command line tool answers on the user's plan, also with no key.
+ * `source` tells the row which it is.
  */
 export function KeyStatusList({
   statuses,
@@ -62,7 +78,7 @@ export function KeyStatusList({
               {/* "key found" on a machine with no keys at all, said three times
                   over, is the first thing a reader of the repo sees when they
                   boot the demo with OVERHEARD_MOCK_PROVIDERS=1. */}
-              {status.source === "mock" ? "mock provider" : "key found"}
+              {sourceLabel(status)}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -127,7 +143,11 @@ export function KeyStatusList({
         Overheard AI reads keys from the .env file in its folder, and reads it again whenever it
         looks one up, so a key you add or change there needs no restart. A key set in your shell
         wins over the file. It never sends keys to the browser, writes them to the database or logs
-        them. The provider bills your runs to you directly.
+        them. The provider bills your runs to you directly. With a Claude or ChatGPT plan instead of
+        a key, set <code className="num text-foreground">{PROVIDER_CLI.anthropic.env}</code> or{" "}
+        <code className="num text-foreground">{PROVIDER_CLI.openai.env}</code> and Overheard AI asks
+        through {PROVIDER_CLI.anthropic.tool} or {PROVIDER_CLI.openai.tool}, signed in with your
+        plan. The README's subscription mode section says what changes.
       </p>
       <details className="px-4 pb-4">
         <summary className="cursor-pointer py-1 text-xs text-muted-foreground">

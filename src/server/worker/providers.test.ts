@@ -1466,3 +1466,46 @@ describe("reporting a reply cut off at the output cap", () => {
     expect(whole.truncated).toBe(false);
   });
 });
+
+describe("subscription mode", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+    delete process.env["OVERHEARD_OPENAI_CLI"];
+  });
+
+  it("asks through the command, never the API, and does not retry a missing command", async () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = "overheard-no-such-command";
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const error = await callProvider({
+      provider: "anthropic",
+      modelId: "claude-sonnet-5",
+      apiKey: "unused",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      webSearch: true,
+    }).catch((err: unknown) => err);
+    expect(error).toMatchObject({ code: "CLI_SIGN_IN:anthropic", status: 401, retryable: false });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("tells the setup check to sign the command in, not to fix a key", async () => {
+    process.env["OVERHEARD_OPENAI_CLI"] = "overheard-no-such-command";
+    const verdict = await searchCheck("openai", "gpt-5.6-terra");
+    expect(verdict.status).toBe("invalid_key");
+    expect(verdict.message).toBe("The codex command could not answer with your ChatGPT plan.");
+    expect(verdict.hint).toBe(
+      "Check Codex is installed, then run codex login in a terminal and check again.",
+    );
+    const extractor = await extractorCheck("openai", "gpt-5.6-luna");
+    expect(extractor.message).toBe("The codex command could not answer with your ChatGPT plan.");
+  });
+
+  it("presses for a search in words, since neither command can force one", () => {
+    expect(canForceSearch("openai", "gpt-5.6-terra")).toBe(true);
+    process.env["OVERHEARD_OPENAI_CLI"] = "codex";
+    expect(canForceSearch("openai", "gpt-5.6-terra")).toBe(false);
+  });
+});

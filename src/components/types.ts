@@ -191,10 +191,11 @@ export type KeyStatus = {
   /**
    * Why it is configured. Mirrors `ProviderKeyStatus.source`: "env" is a real
    * key, "mock" is the offline seam answering for a provider the user has no
-   * key for, "none" is neither. Without it the settings screen says "key found"
-   * three times over on a machine with no keys at all.
+   * key for, "cli" is subscription mode, "none" is none of them. Without it the
+   * settings screen says "key found" three times over on a machine with no
+   * keys at all.
    */
-  source: "env" | "mock" | "none";
+  source: "env" | "mock" | "cli" | "none";
   result: SetupCheckState;
 };
 
