@@ -15,7 +15,7 @@
 
 A buyer needs to make a purchase so they open an AI chat and ask for recommendations. The AI comes back with four companies, each with their pros and cons, ultimately recommending one for them. The buyer reaches out... 
 
-More purchases start this way now. In [G2's 2026 survey][g2] of over 1,000 software buyers, 51% said they begin research in an AI chatbot more often than in Google, up from 29% in April 2025. Sixty-nine percent chose a different vendor than they'd planned based on a chatbot's guidance, and a third bought from a vendor they'd never heard of. 
+More purchases start this way now. In [G2's 2026 survey](https://learn.g2.com/g2-2026-ai-search-insight-report) of over 1,000 software buyers, 51% said they begin research in an AI chatbot more often than in Google, up from 29% in April 2025. Sixty-nine percent chose a different vendor than they'd planned based on a chatbot's guidance, and a third bought from a vendor they'd never heard of. 
 
 For startups, this is an opening. It also raises the question we kept hearing from founders: how can we track what AI saying about us? 
 
@@ -223,13 +223,12 @@ four checks CI runs, and the one rule about test data: fictional brands only.
 
 ## From Trellace
 
-[Trellace][trellace] works with B2B founders in the messy middle, after product-market fit and
-before a repeatable go-to-market team. That's usually $1 million to $10 million in annual
-revenue. We publish the methods and tools we use because GTM needs more open source projects.
+[Trellace][trellace] works with B2B founders on creative GTM approaches, who are in between product-market fit and
+mainstream adoption. We publish the methods and tools we use because we believe GTM needs more open source projects.
 
 - **Founders.** If you'd like help reading what the assistants say about you, or deciding what
   to change, [book a 30-minute GTM Sparring Session][contact].
-- **Investors.** Most of our work starts with an introduction from a fund. If a company you
+- **Investors.** Many of our relationships start with an introduction from a VC. If a company you
   back comes to mind, [make an introduction][contact].
 - **More free tools.** See everything we've published at
   [github.com/TrellaceTeam](https://github.com/TrellaceTeam).
