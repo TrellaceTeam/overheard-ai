@@ -47,9 +47,14 @@ const SHARED_RULES = `Rules:
    bullet points, no headings, no markdown.
 4. Do not grade, score or rate anything. "downsides" holds only criticisms the
    text itself raises, in its own terms.
-5. Set knows_brand false when the text says it is unfamiliar with the brand,
-   cannot find it, or is confusing it with something else. When it is false,
-   every other field is usually empty, and that is correct.`;
+5. Set knows_brand false only when the text gives no description of this
+   brand: it says it knows nothing about it and found nothing, or it describes
+   a different company with the same name. The assistant searched the web
+   before answering, so a text that says it was not familiar with the brand
+   beforehand and then describes the brand from what it found does recognise
+   it: set knows_brand true and fill the fields from that description. When
+   knows_brand is false, every other field is usually empty, and that is
+   correct.`;
 
 const SCHEMA = `Schema:
 {"knows_brand":boolean,"what_it_does":string,"typical_customers":string,
@@ -264,7 +269,9 @@ export async function summarisePerception(
     knows_brand: known.length > 0,
     run_id: runId,
     question_text: question,
-    source_answers: perModel.length,
+    // The answers merged, so "Merged from" and "did not recognize" add up to
+    // the assistants asked instead of counting a blank answer twice.
+    source_answers: forPrompt.length,
   });
 
   const anchor = done[0];
