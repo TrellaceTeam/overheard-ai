@@ -13,20 +13,16 @@
 
 </div>
 
-When a buyer asks ChatGPT for the best tool in your category, you make the list or you don't,
-and nothing in your analytics tells you which. In [G2's survey][g2], 51% of B2B software buyers
-now start their research in an AI chatbot more often than in Google.
+A buyer needs to make a purchase so they open an AI chat and ask for recommendations. The AI comes back with four companies, each with their pros and cons, ultimately recommending one for them. The buyer reaches out... 
 
-One answer tells you little. [SparkToro][sparktoro] found less than a 1 in 100 chance that
-ChatGPT or Google's AI gives the same list of brands in any two of 100 responses. So Overheard AI
-asks your buyers' questions many times, of each assistant, with web search on. Then it counts
-how often you are named, ranked in the top three and linked, next to your competitors.
+More purchases start this way now. In [G2's 2026 survey][g2] of over 1,000 software buyers, 51% said they begin research in an AI chatbot more often than in Google, up from 29% in April 2025. Sixty-nine percent chose a different vendor than they'd planned based on a chatbot's guidance, and a third bought from a vendor they'd never heard of. 
 
-It runs on your machine with your own API keys, and every answer lands in one SQLite file you
-own. There is no account and no telemetry.
+For startups, this is an opening. It also raises the question we kept hearing from founders: how can we track what AI saying about us? 
 
-[g2]: https://www.prnewswire.com/news-releases/new-g2-research-half-of-b2b-software-buyers-now-start-their-research-with-ai-chatbots-302742807.html
-[sparktoro]: https://sparktoro.com/blog/new-research-ais-are-highly-inconsistent-when-recommending-brands-or-products-marketers-should-take-care-when-tracking-ai-visibility/
+We built Overheard AI to answer that question and we've released it free and open source.
+
+It runs on your machine with your AI accounts and every answer lands in one SQLite file you
+own. There is no sign up, no credit card, and no telemetry.
 
 ## Quickstart
 
