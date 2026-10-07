@@ -123,27 +123,34 @@ export function KeyStatusList({
           </Button>
         </div>
       )}
-      <p className="p-4 text-xs text-muted-foreground">
-        Overheard AI reads keys from the .env file in its folder, and reads it again whenever it
-        looks one up, so a key you add or change there needs no restart. A key set in your shell
-        wins over the file. It never sends keys to the browser, writes them to the database or logs
-        them. The provider bills your runs to you directly.
-      </p>
-      <details className="px-4 pb-4">
-        <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
-          Where do I get a key?
-        </summary>
-        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-          {PROVIDER_KEY_PAGES.map(({ provider, url }) => (
-            <li key={provider}>
-              {providerLabel(provider)}:{" "}
-              <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">
-                {url.replace(/^https:\/\//, "")}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </details>
+      <div className="space-y-1 px-4 py-3">
+        <details>
+          <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+            How Overheard AI reads keys
+          </summary>
+          <ul className="my-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+            <li>From the .env file in its folder, read again on every lookup, so no restart.</li>
+            <li>A key set in your shell wins over the file.</li>
+            <li>Keys never reach the browser, the database or a log.</li>
+            <li>The provider bills your runs to you directly.</li>
+          </ul>
+        </details>
+        <details>
+          <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+            Where do I get a key?
+          </summary>
+          <ul className="my-2 space-y-1 text-xs text-muted-foreground">
+            {PROVIDER_KEY_PAGES.map(({ provider, url }) => (
+              <li key={provider}>
+                {providerLabel(provider)}:{" "}
+                <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">
+                  {url.replace(/^https:\/\//, "")}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
     </div>
   );
 }

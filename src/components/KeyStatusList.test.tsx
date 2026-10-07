@@ -46,6 +46,13 @@ describe("KeyStatusList", () => {
     expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
   });
 
+  it("keeps how keys are read behind a closed disclosure, not in a block of text", () => {
+    render(<KeyStatusList statuses={statuses} onCheck={() => {}} />);
+    const explanation = screen.getByText("A key set in your shell wins over the file.");
+    expect(explanation.closest("details")?.open).toBe(false);
+    expect(screen.getByText("How Overheard AI reads keys")).toBeDefined();
+  });
+
   it("offers the key dashboards behind a disclosure", () => {
     render(<KeyStatusList statuses={statuses} onCheck={() => {}} />);
     expect(screen.getByText("Where do I get a key?")).toBeDefined();
@@ -135,8 +142,8 @@ describe("KeyStatusList", () => {
   it("carries the tour attribute and says keys never reach the browser", () => {
     const { container } = render(<KeyStatusList statuses={statuses} onCheck={() => {}} />);
     expect(container.querySelector('[data-tour="key-status"]')).not.toBeNull();
-    expect(screen.getByText(/never sends keys to the browser/)).toBeDefined();
-    expect(screen.getByText(/needs no restart/)).toBeDefined();
+    expect(screen.getByText(/Keys never reach the browser/)).toBeDefined();
+    expect(screen.getByText(/so no restart/)).toBeDefined();
   });
 });
 
