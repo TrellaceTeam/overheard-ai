@@ -53,8 +53,8 @@ run behaves, and what is deliberately left out. `docs/architecture.md` explains 
   `NO_WEB_SEARCH` and is retried. The search is forced wherever the API allows it: OpenAI
   with `tool_choice: "required"`, Anthropic with a forced tool and
   `allowed_callers: ["direct"]` on the models that accept a forced tool. Gemini has no force
-  mode and Claude Opus 5.5 rejects one, so their system prompt tells them to search, and a
-  retry adds an instruction to search to the question.
+  mode and Claude Opus 5.5 and Sonnet 5.5 reject one, so their system prompt tells them to
+  search, and a retry adds an instruction to search to the question.
 - Every extraction request carries its JSON schema in the provider's own form: OpenAI strict
   structured outputs, a Gemini response schema, an Anthropic forced tool use, or Anthropic
   structured output on a model that rejects forced tools. The setup check's extractor probe

@@ -499,13 +499,13 @@ function fromChatCompletion(json: unknown, searchCalls = 0): ProviderResult {
 const ANTHROPIC_FORCED_SEARCH = { type: "tool", name: "web_search" } as const;
 
 /**
- * Whether an Anthropic model accepts a forced tool_choice. Claude Opus 5.5 and
- * the Fable and Mythos models answer tool_choice "tool" or "any" with a 400.
- * They are offered the search tool unforced, and a JSON shape is enforced with
- * output_config.format instead of a forced tool.
+ * Whether an Anthropic model accepts a forced tool_choice. Claude Opus 5.5,
+ * Claude Sonnet 5.5 and the Fable and Mythos models answer tool_choice "tool"
+ * or "any" with a 400. They are offered the search tool unforced, and a JSON
+ * shape is enforced with output_config.format instead of a forced tool.
  */
 export function anthropicAcceptsForcedTools(modelId: string): boolean {
-  return !/claude-(opus-5-5|fable|mythos)/.test(modelId);
+  return !/claude-(opus-5-5|sonnet-5-5|fable|mythos)/.test(modelId);
 }
 
 /**

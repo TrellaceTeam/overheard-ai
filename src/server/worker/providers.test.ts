@@ -544,6 +544,7 @@ describe("canForceSearch", () => {
     expect(canForceSearch("anthropic", "claude-sonnet-5")).toBe(true);
     expect(canForceSearch("anthropic", "claude-opus-5")).toBe(true);
     expect(canForceSearch("anthropic", "claude-opus-5-5")).toBe(false);
+    expect(canForceSearch("anthropic", "claude-sonnet-5-5")).toBe(false);
     expect(canForceSearch("google", "gemini-3.8-flash")).toBe(false);
   });
 
@@ -1038,8 +1039,8 @@ describe("searchCheck", () => {
 
 describe("searchCheckModelId", () => {
   it("picks the current mid tier search-capable model per provider, never a superseded one", () => {
-    expect(searchCheckModelId("openai")).toBe("gpt-6-sol");
-    expect(searchCheckModelId("anthropic")).toBe("claude-sonnet-5");
+    expect(searchCheckModelId("openai")).toBe("gpt-6.1-sol");
+    expect(searchCheckModelId("anthropic")).toBe("claude-sonnet-5-5");
     expect(searchCheckModelId("google")).toBe("gemini-3.8-flash");
   });
 });

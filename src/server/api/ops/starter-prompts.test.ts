@@ -144,15 +144,15 @@ describe("generateStarterPrompts", () => {
       providersWithKeys: ["openai", "anthropic"],
       call: tied.call,
     });
-    // GPT-6 Sol and Claude Sonnet 5 list at the same prices.
-    expect(tied.models[0]?.model_id).toBe("gpt-6-sol");
+    // GPT-6.1 Sol and Claude Sonnet 5.5 list at the same prices.
+    expect(tied.models[0]?.model_id).toBe("gpt-6.1-sol");
 
     const anthropicOnly = calls(GOOD);
     await generateStarterPrompts(database, REQUEST, {
       providersWithKeys: ["anthropic"],
       call: anthropicOnly.call,
     });
-    expect(anthropicOnly.models[0]?.model_id).toBe("claude-sonnet-5");
+    expect(anthropicOnly.models[0]?.model_id).toBe("claude-sonnet-5-5");
   });
 
   it("falls back to the cheapest keyed extractor when every mid-tier model is switched off", async () => {

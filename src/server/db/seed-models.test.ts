@@ -42,6 +42,8 @@ describe("seedModels", () => {
     ).toEqual(
       [
         "claude-opus-5",
+        "claude-sonnet-5",
+        "gpt-6-sol",
         "gemini-3.1-flash-lite",
         "gemini-3.6-flash",
         "gpt-5.6-luna",
