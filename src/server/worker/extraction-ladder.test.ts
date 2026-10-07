@@ -23,10 +23,10 @@ import { ProviderError, type ProviderResult } from "./providers";
 
 /** Catalogue ids, named so an expected order reads as models, not uuids. */
 const LUNA = "gpt-6-luna"; // openai, extraction, rank 1
-const SOL = "gpt-6-sol"; // openai, mid
+const SOL = "gpt-6.1-sol"; // openai, mid
 const ASTRA = "gpt-6-astra"; // openai, frontier
 const HAIKU = "claude-haiku-4-5"; // anthropic, extraction, rank 3
-const SONNET = "claude-sonnet-5"; // anthropic, mid
+const SONNET = "claude-sonnet-5-5"; // anthropic, mid
 const OPUS = "claude-opus-5-5"; // anthropic, frontier
 const FLASH_LITE = "gemini-3.5-flash-lite"; // google, extraction, rank 2
 const GEMINI_FLASH = "gemini-3.8-flash"; // google, mid
@@ -77,7 +77,11 @@ describe("nextTierUp", () => {
   });
 
   it("skips a model the user switched off: disabled means do not pay for it", () => {
-    db.prepare("UPDATE models SET is_active = 0 WHERE model_id = ?").run(SONNET);
+    // Both mid-tier models, the current one and the one it replaced.
+    db.prepare("UPDATE models SET is_active = 0 WHERE model_id IN (?, ?)").run(
+      SONNET,
+      "claude-sonnet-5",
+    );
     const active = db.prepare("SELECT * FROM models WHERE is_active = 1").all<ModelRow>();
     expect(nextTierUp(modelOf(HAIKU), active)?.model_id).toBe(OPUS);
   });

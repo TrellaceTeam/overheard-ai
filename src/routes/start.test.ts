@@ -302,6 +302,7 @@ describe("tutorial mode", () => {
       projectId: "demo-1",
       showcaseRunId: "run-showcase",
     }));
+    tutorialMocks.setTutorial.mockImplementation(async () => ({ ok: true as const }));
   });
 
   it("prefills, locks and is guided by the tour, and never offers a paid check", async () => {
@@ -411,6 +412,30 @@ describe("tutorial mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open the demo project" }));
     const building = await screen.findByRole("heading", { name: "Building the demo" });
     expect(building.parentElement?.textContent).toBe("Building the demo");
+  });
+
+  it("never leaves the demo's values behind as an unfinished setup", async () => {
+    // Finishing flips the state to done while this screen is still mounted. The
+    // form still holds the demo's values then, and a draft saved from them would
+    // fill every later New project with the demo brand.
+    tutorialMocks.setTutorial.mockImplementation(async (...args: unknown[]) => {
+      const call = args[0] as { data: { state: string } };
+      tutorialMocks.state.tutorial = call.data.state;
+      return { ok: true as const };
+    });
+    renderStart();
+
+    const brand = (await screen.findByLabelText("Brand name (required)")) as HTMLInputElement;
+    await waitFor(() => expect(brand.value).toBe("Acme Analytics"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open the demo project" }));
+    await waitFor(() =>
+      expect(tutorialMocks.setTutorial).toHaveBeenCalledWith({ data: { state: "done" } }),
+    );
+    await waitFor(() => expect(tutorialMocks.navigate).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(localStorage.getItem("overheard:setup-draft")).toBeNull();
   });
 
   it("a re-run from Settings replays the tour on the tutorial state alone", async () => {

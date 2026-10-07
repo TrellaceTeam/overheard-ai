@@ -36,7 +36,7 @@ describe("checkProviders", () => {
     const report = await checkProviders(["openai", "google"], probe);
 
     expect(seen).toEqual([
-      ["openai", "gpt-6-sol"],
+      ["openai", "gpt-6.1-sol"],
       ["google", "gemini-3.8-flash"],
     ]);
     expect(report.rows).toHaveLength(2);

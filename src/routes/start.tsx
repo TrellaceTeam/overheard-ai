@@ -185,14 +185,18 @@ function Start() {
     setRestoredAt(draft.savedAt);
   }, [draftChecked, tutorial.isPending, isTutorial, restore]);
 
+  // A form the tutorial seeded holds the demo's values, never a draft. Finishing
+  // the tutorial flips it to done while this screen is still mounted, so the
+  // tutorial state alone would save them and every later New project would open
+  // on the demo brand.
   useEffect(() => {
-    if (!draftChecked || isTutorial || !draftHasContent(draftFields)) return;
+    if (!draftChecked || isTutorial || seeded || !draftHasContent(draftFields)) return;
     writeSetupDraft(browserStorage(), {
       ...draftFields,
       step: step === 1 ? 1 : 0,
       chosenModelIds,
     });
-  }, [draftChecked, isTutorial, draftFields, step, chosenModelIds]);
+  }, [draftChecked, isTutorial, seeded, draftFields, step, chosenModelIds]);
 
   function startOver() {
     clearSetupDraft(browserStorage());

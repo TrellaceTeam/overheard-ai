@@ -139,31 +139,47 @@ export function KeyStatusList({
           </Button>
         </div>
       )}
-      <p className="p-4 text-xs text-muted-foreground">
-        Overheard AI reads keys from the .env file in its folder, and reads it again whenever it
-        looks one up, so a key you add or change there needs no restart. A key set in your shell
-        wins over the file. It never sends keys to the browser, writes them to the database or logs
-        them. The provider bills your runs to you directly. With a Claude or ChatGPT plan instead of
-        a key, set <code className="num text-foreground">{PROVIDER_CLI.anthropic.env}</code> or{" "}
-        <code className="num text-foreground">{PROVIDER_CLI.openai.env}</code> and Overheard AI asks
-        through {PROVIDER_CLI.anthropic.tool} or {PROVIDER_CLI.openai.tool}, signed in with your
-        plan. The README's subscription mode section says what changes.
-      </p>
-      <details className="px-4 pb-4">
-        <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
-          Where do I get a key?
-        </summary>
-        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-          {PROVIDER_KEY_PAGES.map(({ provider, url }) => (
-            <li key={provider}>
-              {providerLabel(provider)}:{" "}
-              <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">
-                {url.replace(/^https:\/\//, "")}
-              </a>
+      <div className="space-y-1 px-4 py-3">
+        <details>
+          <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+            How Overheard AI reads keys
+          </summary>
+          <ul className="my-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+            <li>From the .env file in its folder, read again on every lookup, so no restart.</li>
+            <li>A key set in your shell wins over the file.</li>
+            <li>Keys never reach the browser, the database or a log.</li>
+            <li>The provider bills your runs to you directly.</li>
+          </ul>
+        </details>
+        <details>
+          <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+            Where do I get a key?
+          </summary>
+          <ul className="my-2 space-y-1 text-xs text-muted-foreground">
+            {PROVIDER_KEY_PAGES.map(({ provider, url }) => (
+              <li key={provider}>
+                {providerLabel(provider)}:{" "}
+                <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">
+                  {url.replace(/^https:\/\//, "")}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+        <details>
+          <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+            Use a Claude or ChatGPT plan instead
+          </summary>
+          <ul className="my-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+            <li>
+              With no key, Overheard AI asks through {PROVIDER_CLI.anthropic.tool} or{" "}
+              {PROVIDER_CLI.openai.tool} when it is installed and signed in with your plan.
             </li>
-          ))}
-        </ul>
-      </details>
+            <li>A key, when one is set, wins over the plan.</li>
+            <li>The README's subscription mode section says what changes.</li>
+          </ul>
+        </details>
+      </div>
     </div>
   );
 }

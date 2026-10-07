@@ -336,7 +336,7 @@ describe("migrate", () => {
 
     seedModels(handle);
     expect(flag("gpt-5.6-terra")).toBe(1);
-    expect(flag("gpt-6-sol")).toBe(0);
+    expect(flag("gpt-6.1-sol")).toBe(0);
   });
 
   it("records nothing when a migration throws", () => {
