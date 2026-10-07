@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Driver } from "../../db/driver";
 import { freshDb, HAIKU, seedProject, SONNET } from "../../logic/test-support";
+import { standInCommand } from "../../worker/cli-test-support";
 import {
   listExtractionModels,
   listModels,
@@ -34,7 +35,7 @@ describe("pricedForThisInstall", () => {
 
   it("prices a provider in subscription mode at nothing and leaves a keyed one at list", () => {
     const db = open();
-    process.env["OVERHEARD_ANTHROPIC_CLI"] = "claude";
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
     const listed = listModels(db);
     const rows = pricedForThisInstall(listed);
     const sonnet = rows.find((model) => model.id === SONNET);

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Driver } from "../../db/driver";
 import { freshDb, setProviderKeys } from "../../logic/test-support";
+import { standInCommand } from "../../worker/cli-test-support";
 import { clearAvailabilityCache, modelAvailability } from "./model-availability";
 
 let db: Driver;
@@ -16,6 +17,8 @@ afterEach(() => {
   restoreKeys();
   restoreKeys = () => {};
   delete process.env["OVERHEARD_MOCK_PROVIDERS"];
+  delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+  delete process.env["OVERHEARD_OPENAI_CLI"];
   db.close();
 });
 
@@ -65,6 +68,26 @@ describe("modelAvailability", () => {
       status: "error",
       message: "The provider refused this key, so its models could not be listed.",
     });
+  });
+
+  it("reads a ChatGPT plan's models through Codex, and says the list is the plan's", async () => {
+    process.env["OVERHEARD_OPENAI_CLI"] = standInCommand(
+      `process.stdout.write(JSON.stringify({ models: [{ slug: "gpt-6.1-sol" }, { slug: "gpt-6-luna" }, { slug: "assistant-alpha" }] }));`,
+    );
+    const report = await modelAvailability(db);
+    const openai = report.openai;
+    expect(openai.status === "ok" && openai.plan).toBe(true);
+    if (openai.status !== "ok") return;
+    expect(openai.available.sort()).toEqual(["gpt-6-luna", "gpt-6.1-sol"]);
+    expect(openai.missing).toContain("gpt-6-astra");
+  });
+
+  it("offers every model when a plan's command has no list to read", async () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
+    process.env["OVERHEARD_OPENAI_CLI"] = standInCommand(`process.stdout.write("not json");`);
+    const report = await modelAvailability(db);
+    expect(report.anthropic).toEqual({ status: "cli" });
+    expect(report.openai).toEqual({ status: "cli" });
   });
 
   it("calls nothing under the mock seam", async () => {

@@ -87,7 +87,10 @@ export function KeyStatusList({
               <code className="num text-foreground">
                 {keyEnvNamesSafe(status.provider) ?? "its API key"}
               </code>{" "}
-              to your .env file.
+              to your .env file
+              {isCliProvider(status.provider)
+                ? `, or install ${PROVIDER_CLI[status.provider].tool} and sign in with your plan.`
+                : "."}
             </span>
           )}
 
@@ -208,12 +211,13 @@ function ModelsOnKey({
     });
   const available = named(report.available);
   const missing = named(report.missing);
+  const source = report.plan ? "your plan" : "this key";
   return (
     <p className="basis-full text-xs text-muted-foreground">
       {available.length > 0
-        ? `Models on this key: ${available.join(", ")}.`
-        : "This key lists none of the models Overheard AI offers."}
-      {missing.length > 0 && ` Not on this key: ${missing.join(", ")}.`}
+        ? `Models on ${source}: ${available.join(", ")}.`
+        : `${report.plan ? "Your plan" : "This key"} lists none of the models Overheard AI offers.`}
+      {missing.length > 0 && ` Not on ${source}: ${missing.join(", ")}.`}
     </p>
   );
 }

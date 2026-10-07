@@ -10,6 +10,7 @@ import {
   resolveProviderKey,
   UNUSABLE_KEY_MESSAGE,
 } from "./keys";
+import { standInCommand } from "./cli-test-support";
 
 const VARS = [
   "OPENAI_API_KEY",
@@ -136,12 +137,31 @@ describe("keyStatus", () => {
 });
 
 describe("subscription mode", () => {
-  it("asks a provider through the command its variable names, ahead of its key", () => {
-    process.env["ANTHROPIC_API_KEY"] = "sk-ant-anthropic";
-    process.env["OVERHEARD_ANTHROPIC_CLI"] = "  claude ";
-    expect(providerCli("anthropic")).toEqual({ provider: "anthropic", command: "claude" });
+  it("asks a provider through an installed command when it has no key", () => {
+    const command = standInCommand();
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = `  ${command} `;
+    expect(providerCli("anthropic")).toEqual({ provider: "anthropic", command });
     expect(resolveProviderKey("anthropic")).toBe(CLI_KEY);
     expect(configuredProviders()).toEqual(["anthropic"]);
+    expect(keyStatus().find((s) => s.provider === "anthropic")?.source).toBe("cli");
+  });
+
+  it("lets a key win over the command, because a pasted key is a choice", () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
+    process.env["ANTHROPIC_API_KEY"] = "sk-ant-anthropic";
+    expect(providerCli("anthropic")).toBeNull();
+    expect(resolveProviderKey("anthropic")).toBe("sk-ant-anthropic");
+  });
+
+  it("ignores a named command that is not installed, so .env.example can name both", () => {
+    process.env["OVERHEARD_OPENAI_CLI"] = "overheard-no-such-command";
+    expect(providerCli("openai")).toBeNull();
+    expect(keyStatus().find((s) => s.provider === "openai")).toEqual({
+      provider: "openai",
+      configured: false,
+      source: "none",
+      problem: null,
+    });
   });
 
   it("has no route for a provider without a command line tool", () => {
@@ -149,25 +169,14 @@ describe("subscription mode", () => {
   });
 
   it("counts a plan's calls as costing nothing, and a key's as billed", () => {
-    process.env["OVERHEARD_OPENAI_CLI"] = "codex";
+    process.env["OVERHEARD_OPENAI_CLI"] = standInCommand();
     expect(billsNothing("openai")).toBe(true);
     expect(billsNothing("anthropic")).toBe(false);
   });
 
-  it("says which command answers, and why it cannot when it is missing", () => {
-    process.env["OVERHEARD_OPENAI_CLI"] = "overheard-no-such-command";
-    expect(keyStatus().find((s) => s.provider === "openai")).toEqual({
-      provider: "openai",
-      configured: true,
-      source: "cli",
-      problem:
-        'Overheard AI cannot find "overheard-no-such-command". Install Codex and sign in to it, or set OVERHEARD_OPENAI_CLI to the command\'s full path.',
-    });
-  });
-
   it("leaves the mock seam in charge when both are on", () => {
     process.env["OVERHEARD_MOCK_PROVIDERS"] = "1";
-    process.env["OVERHEARD_ANTHROPIC_CLI"] = "claude";
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
     expect(keyStatus().find((s) => s.provider === "anthropic")?.source).toBe("mock");
     expect(resolveProviderKey("anthropic")).not.toBe(CLI_KEY);
   });

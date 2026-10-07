@@ -12,11 +12,13 @@
  *
  * A provider in subscription mode needs no key: its variable names the
  * command line tool it is asked through, and that tool signs in with the
- * user's plan. Precedence is the mock seam, then subscription mode, then a key.
+ * user's plan. The mode applies only while the provider has no key and the
+ * command is installed, so .env.example can name both commands for everyone.
+ * Precedence is the mock seam, then a key, then subscription mode.
  */
 import type { Provider } from "../db/types";
 import { isCliProvider, PROVIDER_CLI, type CliProvider } from "@/lib/provider-keys";
-import { cliProblem } from "./cli-command";
+import { cliProblem, lookupLaunch } from "./cli-command";
 import { refreshEnvKeys } from "./env-file";
 import { mockProvidersEnabled } from "./mock-provider";
 
@@ -53,14 +55,18 @@ export interface CliTarget {
 
 /**
  * The command a provider is asked through, or null when it is asked through
- * its API. Read at call time, like a key, so a line added to .env applies
- * without a restart.
+ * its API: it has a key, its variable is empty, or the command is not
+ * installed. Read at call time, like a key, so a line added to .env or a tool
+ * installed later applies without a restart. A command that is found but
+ * cannot be started still counts, so the key panel can say why.
  */
 export function providerCli(provider: string): CliTarget | null {
   if (!isCliProvider(provider)) return null;
   refreshEnvKeys();
   const command = process.env[PROVIDER_CLI[provider].env]?.trim();
-  return command ? { provider, command } : null;
+  if (!command || envKey(provider) !== null) return null;
+  const lookup = lookupLaunch(command);
+  return lookup.found || lookup.reason === "unstartable" ? { provider, command } : null;
 }
 
 /** Whether calls to this provider cost the install nothing: the offline seam, or a plan. */

@@ -95,6 +95,18 @@ describe("assistantMenus", () => {
     });
   });
 
+  it("says plan, not key, when the list came through a plan's command", () => {
+    const openai = menus({
+      availability: {
+        openai: { status: "ok", available: ["gpt-mid"], missing: ["gpt-top"], plan: true },
+      },
+    })[0]!;
+    expect(openai.items.find((item) => item.id === "top")).toMatchObject({
+      disabled: true,
+      note: "not on your plan",
+    });
+  });
+
   it("still lets a ticked model the key stopped listing be switched off", () => {
     const openai = menus({
       selectedIds: new Set(["top"]),

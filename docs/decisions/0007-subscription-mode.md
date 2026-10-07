@@ -6,8 +6,15 @@ Status: proposed 2026-10-06.
 
 A provider can be asked through the command line tool its maker ships, signed in with the
 user's own plan, instead of through its API with a key. `OVERHEARD_ANTHROPIC_CLI` names
-Claude Code's command (`claude`) and `OVERHEARD_OPENAI_CLI` names Codex's (`codex`). A provider
-set this way never uses its API key. Google has no such route yet.
+Claude Code's command (`claude`) and `OVERHEARD_OPENAI_CLI` names Codex's (`codex`), and
+`.env.example` sets both. A provider uses its command only while it has no key and the
+command is installed, so a copied `.env` turns the mode on for anyone who has the tools and
+off for anyone who doesn't, with nothing to fill in. A pasted key wins, because it is an
+explicit choice and the API path is the cleaner measurement. Google has no such route yet.
+
+On the Account settings screen, the ChatGPT row lists the catalogue models Codex offers the
+signed-in account, read from `codex debug models`, which makes no model call. Claude Code has
+no such list, so its setup check's one real call is the test there.
 
 Everything else stays as it is: the queue, the claim caps, retries, extraction and its ladder,
 scoring and the schedule. The switch happens at the one place every provider call passes,

@@ -83,6 +83,7 @@ import {
 } from "./queries";
 import { writePerceptionSummary } from "../logic/perception-summary";
 import { INFLIGHT_CAP_MAX } from "@/lib/inflight-caps";
+import { standInCommand } from "./cli-test-support";
 
 const db = {} as Driver;
 
@@ -1240,7 +1241,10 @@ describe("costOf", () => {
   });
 
   it("prices a call on a plan at nothing, because the plan bills per month, not per call", () => {
-    process.env["OVERHEARD_ANTHROPIC_CLI"] = "claude";
+    // A key wins over the plan, and this file keeps keys set for the passes.
+    const key = process.env["ANTHROPIC_API_KEY"];
+    delete process.env["ANTHROPIC_API_KEY"];
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
     try {
       const planModel = { ...(model as object), provider: "anthropic" } as never;
       expect(costOf(planModel, { inputTokens: 1_000_000, outputTokens: 0, searchCalls: 1 })).toBe(
@@ -1249,6 +1253,7 @@ describe("costOf", () => {
       expect(worstCaseCost(planModel, "answer")).toBe(0);
     } finally {
       delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+      if (key !== undefined) process.env["ANTHROPIC_API_KEY"] = key;
     }
   });
 

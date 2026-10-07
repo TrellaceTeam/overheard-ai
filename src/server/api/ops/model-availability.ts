@@ -14,14 +14,18 @@ import type { Provider } from "../../db/types";
 import { PROVIDERS, providerCli, resolveProviderKey } from "../../worker/keys";
 import { mockProvidersEnabled } from "../../worker/mock-provider";
 import { listedModel, listKeyModels } from "../../worker/model-list";
+import { listCliModels } from "../../worker/cli-provider";
 import { ProviderError } from "../../worker/providers";
 
 export type ProviderAvailability =
-  /** Catalogue model ids, as model_id strings, on and not on the key's list. */
-  | { status: "ok"; available: string[]; missing: string[] }
+  /**
+   * Catalogue model ids, as model_id strings, on and not on the list. `plan`
+   * marks a list read through a subscription-mode command, not a key.
+   */
+  | { status: "ok"; available: string[]; missing: string[]; plan?: true }
   | { status: "no_key" }
   | { status: "mocked" }
-  /** Subscription mode. A plan has no model list to read, so every model is offered. */
+  /** Subscription mode with no list to read, so every model is offered. */
   | { status: "cli" }
   | { status: "error"; message: string };
 
@@ -33,7 +37,10 @@ const FRESH_MS = 10 * 60_000;
 const FAILED_FRESH_MS = 30_000;
 
 interface Cached {
-  /** A one-way fingerprint, so a changed key misses the cache. Never the key. */
+  /**
+   * A one-way fingerprint of the key, so a changed key misses the cache, or
+   * the command for a plan. Never the key.
+   */
   keyPrint: string;
   expiresAt: number;
   ids: string[] | null;
@@ -62,16 +69,15 @@ function failureMessage(error: unknown): string {
 
 async function listFor(
   provider: Provider,
-  apiKey: string,
+  print: string,
   force: boolean,
-  fetchImpl: typeof fetch | undefined,
+  list: () => Promise<string[]>,
 ): Promise<Pick<Cached, "ids" | "error">> {
   const now = Date.now();
-  const print = keyPrint(apiKey);
   const held = cache().get(provider);
   if (!force && held && held.keyPrint === print && held.expiresAt > now) return held;
   try {
-    const ids = await listKeyModels(provider, apiKey, fetchImpl);
+    const ids = await list();
     const entry = { keyPrint: print, expiresAt: now + FRESH_MS, ids, error: null };
     cache().set(provider, entry);
     return entry;
@@ -99,29 +105,48 @@ export async function modelAvailability(
     .prepare("SELECT provider, model_id FROM models WHERE is_active = 1")
     .all<{ provider: Provider; model_id: string }>();
 
+  const force = options.force === true;
   const entries = await Promise.all(
     PROVIDERS.map(async (provider): Promise<[Provider, ProviderAvailability]> => {
       if (mockProvidersEnabled()) return [provider, { status: "mocked" }];
-      if (providerCli(provider)) return [provider, { status: "cli" }];
+      const own = catalogue.filter((model) => model.provider === provider);
+      const cli = providerCli(provider);
+      if (cli) {
+        const listed = await listFor(provider, `cli:${cli.command}`, force, async () => {
+          const ids = await listCliModels(cli);
+          if (ids === null) throw new Error("NO_MODEL_LIST");
+          return ids;
+        });
+        return [
+          provider,
+          listed.ids === null ? { status: "cli" } : { ...split(own, listed.ids), plan: true },
+        ];
+      }
       const apiKey = resolveProviderKey(provider);
       if (!apiKey) return [provider, { status: "no_key" }];
-      const listed = await listFor(provider, apiKey, options.force === true, options.fetchImpl);
+      const listed = await listFor(provider, keyPrint(apiKey), force, () =>
+        listKeyModels(provider, apiKey, options.fetchImpl),
+      );
       if (listed.ids === null) {
         return [provider, { status: "error", message: listed.error ?? failureMessage(null) }];
       }
-      const ids = new Set(listed.ids);
-      const own = catalogue.filter((model) => model.provider === provider);
-      return [
-        provider,
-        {
-          status: "ok",
-          available: own.filter((m) => listedModel(m.model_id, ids)).map((m) => m.model_id),
-          missing: own.filter((m) => !listedModel(m.model_id, ids)).map((m) => m.model_id),
-        },
-      ];
+      return [provider, split(own, listed.ids)];
     }),
   );
   return Object.fromEntries(entries) as AvailabilityReport;
+}
+
+/** The provider's catalogue models, sorted onto and off a list. */
+function split(
+  own: ReadonlyArray<{ model_id: string }>,
+  listed: readonly string[],
+): { status: "ok"; available: string[]; missing: string[] } {
+  const ids = new Set(listed);
+  return {
+    status: "ok",
+    available: own.filter((m) => listedModel(m.model_id, ids)).map((m) => m.model_id),
+    missing: own.filter((m) => !listedModel(m.model_id, ids)).map((m) => m.model_id),
+  };
 }
 
 /** Forget every cached list. For tests. */

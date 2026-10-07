@@ -20,7 +20,8 @@ export interface MenuModel {
 
 /** One provider's line from the availability report. */
 export type AvailabilityView =
-  | { status: "ok"; available: string[]; missing: string[] }
+  /** `plan` marks a list read through a subscription-mode command, not a key. */
+  | { status: "ok"; available: string[]; missing: string[]; plan?: true }
   | { status: "no_key" }
   | { status: "mocked" }
   | { status: "cli" }
@@ -62,6 +63,7 @@ export function assistantMenus(input: {
     const noKey = !keysUnresolved && !keyedProviders.has(group.provider);
     const report = availability?.[group.provider];
     const missing = report?.status === "ok" ? new Set(report.missing) : null;
+    const offNote = report?.status === "ok" && report.plan ? "not on your plan" : "not on your key";
     const ordered = [
       ...group.models.filter((model) => model.superseded !== 1),
       ...group.models.filter((model) => model.superseded === 1),
@@ -69,15 +71,7 @@ export function assistantMenus(input: {
     const items = ordered.map((model): MenuItem => {
       const checked = selectedIds.has(model.id);
       const offKey = missing?.has(model.model_id) ?? false;
-      const note = checked
-        ? offKey
-          ? "not on your key"
-          : null
-        : noKey
-          ? "no key"
-          : offKey
-            ? "not on your key"
-            : null;
+      const note = checked ? (offKey ? offNote : null) : noKey ? "no key" : offKey ? offNote : null;
       return {
         id: model.id,
         label: model.display_name,

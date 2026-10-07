@@ -138,16 +138,16 @@ your plan's usage limits instead of a bill.
 1. Install [Claude Code](https://code.claude.com/docs/en/setup) or
    [Codex](https://developers.openai.com/codex/cli), and sign in with your plan:
    `claude auth login`, or `codex login` with "Sign in with ChatGPT".
-2. Add the command to `.env`. Use its full path if the app runs where the command isn't on
-   your PATH, such as a scheduled task.
-
-   ```sh
-   OVERHEARD_ANTHROPIC_CLI=claude
-   OVERHEARD_OPENAI_CLI=codex
-   ```
-
+2. Leave that provider's API key empty. The `.env` you copied from `.env.example` already
+   names both commands, and Overheard AI uses one whenever its provider has no key and the
+   command is installed. A key, when set, wins.
 3. Account settings now shows "via claude, on your Claude plan". Its Check button makes one
-   real call with web search through the tool.
+   real call with web search through the tool, and the ChatGPT row lists the models your
+   plan offers.
+
+If the app runs where the command isn't on your PATH, such as a scheduled task, put its full
+path in `OVERHEARD_ANTHROPIC_CLI` or `OVERHEARD_OPENAI_CLI`. Empty either line to turn the
+mode off for that provider.
 
 What changes:
 

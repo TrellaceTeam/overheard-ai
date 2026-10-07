@@ -21,7 +21,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PROVIDER_CLI, PROVIDER_KEY_ENV } from "@/lib/provider-keys";
+import { type CliProvider, PROVIDER_CLI, PROVIDER_KEY_ENV } from "@/lib/provider-keys";
 import { type Launch, type LaunchLookup, launchProblem, lookupLaunch } from "./cli-command";
 import type { EnforcedShape } from "./extraction";
 import type { CliTarget } from "./keys";
@@ -161,13 +161,13 @@ export function codexArgs(call: CliCall, files: CallFiles): string[] {
   ];
 }
 
-function cliEnv(call: CliCall): NodeJS.ProcessEnv {
+function cliEnv(provider: CliProvider, jsonMode: boolean): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const name of KEY_VARIABLES) delete env[name];
-  if (call.target.provider === "anthropic") {
+  if (provider === "anthropic") {
     // Many processes at once must not each try to update the binary they run from.
     env["DISABLE_AUTOUPDATER"] = "1";
-    if (call.jsonMode) env["MAX_THINKING_TOKENS"] = "0";
+    if (jsonMode) env["MAX_THINKING_TOKENS"] = "0";
   }
   return env;
 }
@@ -402,6 +402,38 @@ export function runProcess(
   });
 }
 
+/** Long enough for Codex to read its catalogue, short enough not to hold the key panel. */
+const LIST_TIMEOUT_MS = 15_000;
+
+/**
+ * The model ids the signed-in tool offers, or null when it has no list to
+ * read. Codex prints its catalogue for the account with `codex debug models`,
+ * which makes no model call. Claude Code has no such command. A debug command
+ * can change shape between versions, so anything unexpected reads as no list,
+ * never as a failure.
+ */
+export async function listCliModels(target: CliTarget): Promise<string[] | null> {
+  if (target.provider !== "openai") return null;
+  const lookup = lookupLaunch(target.command);
+  if (!lookup.found) return null;
+  const exit = await runProcess(lookup.launch, ["debug", "models"], {
+    cwd: tmpdir(),
+    env: cliEnv(target.provider, false),
+    stdin: "",
+    timeoutMs: LIST_TIMEOUT_MS,
+  });
+  if (exit.timedOut || exit.startError !== null) return null;
+  try {
+    const parsed = JSON.parse(exit.stdout) as { models?: Array<{ slug?: unknown }> };
+    const ids = (parsed.models ?? []).flatMap((model) =>
+      typeof model.slug === "string" ? [model.slug] : [],
+    );
+    return ids.length > 0 ? ids : null;
+  } catch {
+    return null;
+  }
+}
+
 function lastLines(text: string): string {
   return text.trim().split(/\r?\n/).slice(-5).join("\n");
 }
@@ -432,7 +464,7 @@ export async function callCli(call: CliCall, launch?: Launch): Promise<CliOutcom
     const started = Date.now();
     const exit = await runProcess(lookup.launch, args, {
       cwd: dir,
-      env: cliEnv(call),
+      env: cliEnv(provider, call.jsonMode),
       stdin: call.user,
       timeoutMs: call.timeoutMs,
     });

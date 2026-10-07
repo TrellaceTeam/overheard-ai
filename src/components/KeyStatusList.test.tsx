@@ -101,6 +101,43 @@ describe("KeyStatusList", () => {
     expect(screen.queryByText("key found")).toBeNull();
   });
 
+  it("offers the plan route beside the key only where a command line tool exists", () => {
+    render(
+      <KeyStatusList
+        statuses={[
+          { provider: "openai", configured: false, source: "none", result: { state: "untested" } },
+          { provider: "google", configured: false, source: "none", result: { state: "untested" } },
+        ]}
+        onCheck={() => {}}
+      />,
+    );
+    expect(screen.getByText(/or install Codex and sign in with your plan\./)).toBeDefined();
+    expect(screen.getAllByText(/or install/)).toHaveLength(1);
+  });
+
+  it("names a plan's models as the plan's, not a key's", () => {
+    render(
+      <KeyStatusList
+        statuses={[
+          { provider: "openai", configured: true, source: "cli", result: { state: "untested" } },
+        ]}
+        onCheck={() => {}}
+        availability={{
+          openai: { status: "ok", available: ["alpha"], missing: ["beta"], plan: true },
+        }}
+        modelNames={
+          new Map([
+            ["alpha", "Assistant Alpha"],
+            ["beta", "Assistant Beta"],
+          ])
+        }
+      />,
+    );
+    expect(
+      screen.getByText("Models on your plan: Assistant Alpha. Not on your plan: Assistant Beta."),
+    ).toBeDefined();
+  });
+
   it("names the command and the plan when a provider is in subscription mode", () => {
     render(
       <KeyStatusList
