@@ -360,7 +360,9 @@ describe("summarisePerception", () => {
         "SELECT knows_brand, what_it_does, source_answers FROM perception_summaries WHERE model_id IS NULL",
       )
       .get<{ knows_brand: number; what_it_does: string; source_answers: number }>();
-    expect(merged).toEqual({ knows_brand: 1, what_it_does: "Merged.", source_answers: 2 });
+    // One merged answer, beside the one assistant counted as not recognising
+    // the brand: the two numbers the band shows add up to the two asked.
+    expect(merged).toEqual({ knows_brand: 1, what_it_does: "Merged.", source_answers: 1 });
   });
 
   it("leaves the per-assistant rows standing when the merge call fails", async () => {
