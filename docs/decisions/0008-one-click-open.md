@@ -67,9 +67,12 @@ pull`, and never downloads anything.
 
 ## Consequences
 
-- `conhost.exe --headless` is undocumented. Tested on Windows 10 22H2. If a Windows release
-  drops it, the shortcut's minimised window style is the fallback: a window that starts
-  minimised.
+- `conhost.exe --headless` is undocumented. Opened through the shell, as a double-click opens
+  it, it runs Node with no window and keeps it running on Windows 10 22H2, Windows Server 2022
+  and Windows Server 2025, which shares its build with Windows 11 24H2. Started from inside a
+  console instead, conhost on build 26100 returns at once and runs nothing, so the shortcut has
+  to be opened through the shell, and its test does that. The shortcut also asks Windows to
+  start it minimised, in case a later release shows a window after all.
 - The Mac app is untested on a physical Mac at the time of writing. CI builds it with
   `osacompile` and opens it with `open` on the macOS runner.
 - A Mac app that starts in a folder macOS protects, such as Documents, may ask once for access.
