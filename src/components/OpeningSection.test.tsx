@@ -11,10 +11,14 @@ describe("OpeningSection", () => {
     expect(screen.getByText("npm run shortcut")).toBeDefined();
   });
 
-  it("says a rebuild never downloads anything while the switch is on", () => {
+  it("says a rebuild uses only the code in the folder while the switch is on", () => {
     render(<OpeningSection on={true} readFailed={false} saving={false} onChange={() => {}} />);
     expect(screen.getByRole("switch", { name: "Rebuild after the code changes" })).toBeDefined();
-    expect(screen.getByText(/It never downloads anything\.$/)).toBeDefined();
+    expect(
+      screen.getByText(
+        "Rebuilds only the code already in this folder, for example after you run git pull. It never checks for or downloads updates.",
+      ),
+    ).toBeDefined();
   });
 
   it("turns the rebuild off from the switch, and says what that leaves to you", () => {

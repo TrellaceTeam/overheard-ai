@@ -2,7 +2,7 @@ import { MousePointerClick } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 const HINTS = {
-  on: "When the icon starts Overheard AI and the code in its folder is newer than the last build, as after a git pull, it rebuilds first. That can take up to a minute. It never downloads anything.",
+  on: "Rebuilds only the code already in this folder, for example after you run git pull. It never checks for or downloads updates.",
   off: "The icon starts the last build as it is. After you change or update the code, run npm run build yourself.",
 };
 

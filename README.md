@@ -270,8 +270,9 @@ already holds says so and stops before it opens the database.
 The icon runs `node server/index.mjs --open` in the app's folder. If Overheard AI already holds
 the port, that opens your browser and stops there. If not, it opens your browser at once onto
 a page that waits while the app starts. When the code is newer than the last build, as after a
-`git pull`, it rebuilds first. That never downloads anything, and Account settings can turn it
-off. With no console to read, its output goes to `data/overheard.log`.
+`git pull`, it rebuilds first. It rebuilds only the code already in the folder, and never checks
+for or downloads updates. Account settings can turn it off. With no console to read, its output
+goes to `data/overheard.log`.
 
 On Windows the icon starts Node through `conhost.exe --headless`, so no window appears. On a
 Mac the app keeps the `PATH` of the terminal you ran `npm run shortcut` in, so it finds `node`
