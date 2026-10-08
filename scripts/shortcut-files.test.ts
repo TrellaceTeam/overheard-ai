@@ -1,9 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { linuxDesktopEntry, macAppleScript, macCommand, windowsShortcut } from "./shortcut-files";
+
+const staged: string[] = [];
+afterAll(() => {
+  for (const folder of staged) rmSync(folder, { recursive: true, force: true });
+});
 
 describe("windowsShortcut", () => {
   it("starts Node through a console with no window, from the app's folder", () => {
@@ -20,24 +25,44 @@ describe("windowsShortcut", () => {
   });
 
   it.runIf(process.platform === "win32")(
-    "really runs Node with .env and the entry's arguments, in the app's folder",
-    () => {
-      const root = stagedApp();
+    "opened as a double-click opens it, runs Node with .env in the app's folder, and keeps it running",
+    async () => {
+      // Through the shell, as Explorer opens it. Started from inside a console
+      // instead, conhost on Windows 11 24H2 and Server 2025 returns at once and
+      // runs nothing. The stand-in writes its record after a pause, so the
+      // record proves Node outlived conhost's start.
+      const root = stagedApp("Overheard AI", 1500);
       const shortcut = windowsShortcut(
         { node: process.execPath, root, path: "" },
         process.env["SystemRoot"] ?? "C:\\Windows",
       );
-      const result = spawnSync(shortcut.target, [shortcut.args], {
-        cwd: shortcut.workingDirectory,
-        windowsVerbatimArguments: true,
-        timeout: 20_000,
-      });
-      expect(result.status).toBe(0);
-      expect(JSON.parse(readFileSync(join(root, "ran.json"), "utf8"))).toEqual({
-        args: ["--open"],
-        fromEnvFile: "yes",
-      });
+      const script = `
+$link = (New-Object -ComObject WScript.Shell).CreateShortcut($env:TEST_LINK)
+$link.TargetPath = $env:TEST_TARGET
+$link.Arguments = $env:TEST_ARGS
+$link.WorkingDirectory = $env:TEST_DIR
+$link.WindowStyle = 7
+$link.Save()
+Start-Process $env:TEST_LINK`;
+      const opened = spawnSync(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-Command", script],
+        {
+          env: {
+            ...process.env,
+            TEST_LINK: join(root, "..", "Overheard AI.lnk"),
+            TEST_TARGET: shortcut.target,
+            TEST_ARGS: shortcut.args,
+            TEST_DIR: shortcut.workingDirectory,
+          },
+          timeout: 20_000,
+        },
+      );
+      expect(opened.status).toBe(0);
+      const ran = await waitForFile(join(root, "ran.json"));
+      expect(JSON.parse(ran)).toEqual({ args: ["--open"], fromEnvFile: "yes" });
     },
+    30_000,
   );
 });
 
@@ -81,6 +106,7 @@ describe("macCommand", () => {
       const ran = await waitForFile(join(root, "ran.json"));
       expect(JSON.parse(ran)).toEqual({ args: ["--open"], fromEnvFile: "yes" });
     },
+    30_000,
   );
 });
 
@@ -110,23 +136,27 @@ describe("linuxDesktopEntry", () => {
 
 /**
  * A folder shaped like the app, whose server/index.mjs only records how it was
- * started: its arguments, and a value it can only have read from .env.
+ * started: its arguments, and a value it can only have read from .env. It
+ * writes the record after `delayMs`.
  */
-function stagedApp(name = "Overheard AI"): string {
-  const root = join(mkdtempSync(join(tmpdir(), "overheard-shortcut-")), name);
+function stagedApp(name = "Overheard AI", delayMs = 0): string {
+  const parent = mkdtempSync(join(tmpdir(), "overheard-shortcut-"));
+  staged.push(parent);
+  const root = join(parent, name);
   mkdirSync(join(root, "server"), { recursive: true });
   writeFileSync(join(root, ".env"), "SHORTCUT_TEST=yes\n");
   writeFileSync(
     join(root, "server", "index.mjs"),
     `import { writeFileSync } from "node:fs";
-writeFileSync("ran.json", JSON.stringify({ args: process.argv.slice(2), fromEnvFile: process.env.SHORTCUT_TEST }));
+const record = { args: process.argv.slice(2), fromEnvFile: process.env.SHORTCUT_TEST };
+setTimeout(() => writeFileSync("ran.json", JSON.stringify(record)), ${delayMs});
 `,
   );
   return root;
 }
 
 async function waitForFile(path: string): Promise<string> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     try {
       return readFileSync(path, "utf8");
     } catch {
