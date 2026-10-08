@@ -93,8 +93,10 @@ function ProjectSettings() {
       {/* One disabled fieldset locks every section but the last, because the
           inputs, switches and selects are native buttons and inputs
           underneath. Deleting the demo stays allowed, and Account settings
-          can restore it, so the danger section sits outside the lock. */}
-      <fieldset disabled={isDemo} className="m-0 min-w-0 space-y-8 border-0 p-0">
+          can restore it, so the danger section sits outside the lock.
+          mx-0, not m-0: space-y-8 above spaces the fieldset from the danger
+          section with a bottom margin, and m-0 would win over it. */}
+      <fieldset disabled={isDemo} className="mx-0 min-w-0 space-y-8 border-0 p-0">
         <YourBrandSection projectId={projectId} />
         <PerceptionSection projectId={projectId} />
         <ScheduleSection projectId={projectId} isDemo={isDemo} />
