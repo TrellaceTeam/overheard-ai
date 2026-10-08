@@ -208,14 +208,26 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "content-security-policy": "frame-ancestors 'none'",
 };
 
-/** The response with SECURITY_HEADERS set, copied first if its headers are immutable. */
+/**
+ * Names the app on every response, so a second start of server/index.mjs can
+ * tell Overheard AI from another program holding the port. That file sends the
+ * same header on the pages it shows before the app has loaded.
+ */
+export const APP_HEADER = "x-overheard-ai";
+
+const RESPONSE_HEADERS: Readonly<Record<string, string>> = {
+  ...SECURITY_HEADERS,
+  [APP_HEADER]: "1",
+};
+
+/** The response with SECURITY_HEADERS and APP_HEADER set, copied first if its headers are immutable. */
 export function withSecurityHeaders(response: Response): Response {
   try {
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
+    for (const [name, value] of Object.entries(RESPONSE_HEADERS)) response.headers.set(name, value);
     return response;
   } catch {
     const copy = new Response(response.body, response);
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) copy.headers.set(name, value);
+    for (const [name, value] of Object.entries(RESPONSE_HEADERS)) copy.headers.set(name, value);
     return copy;
   }
 }

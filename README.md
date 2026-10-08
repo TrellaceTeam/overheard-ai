@@ -33,13 +33,19 @@ git clone https://github.com/TrellaceTeam/overheard-ai.git
 cd overheard-ai
 npm install
 cp .env.example .env        # then paste at least one API key into .env
-npm run dev
+npm run shortcut
 ```
 
 In Windows PowerShell, type `npm.cmd` wherever this page says `npm`. PowerShell's default
 execution policy refuses to run `npm`.
 
-Open http://127.0.0.1:3000.
+`npm run shortcut` adds an Overheard AI icon to the Start menu and the desktop on Windows, to
+Applications on a Mac, or to the apps menu on Linux. Then it opens the app in your browser at
+http://127.0.0.1:3000.
+
+From then on, click the icon. It opens the app when it is running and starts it first when it
+is not, with no terminal. Closing the tab leaves the app running, so a bookmark works until
+you quit it or restart the computer. Quit Overheard AI in the app's menu stops it.
 
 No key yet? Start it anyway. The first launch walks you through a demo project with six months of
 generated history. It makes no API calls and costs nothing.
@@ -55,7 +61,8 @@ In Windows PowerShell, run npm.cmd wherever these steps say npm.
 2. git clone https://github.com/TrellaceTeam/overheard-ai.git, then cd overheard-ai
 3. npm install
 4. Copy .env.example to .env. Leave every key empty: I will add mine myself.
-5. Start `npm run dev` in the background, since it keeps running. Tell me the address it prints.
+5. npm run shortcut. It adds an Overheard AI icon and opens the app in my browser. Tell me
+   where it put the icon.
 Never write an API key into a file, a command or a message. If a step fails, show me the
 error and stop.
 ```
@@ -149,8 +156,10 @@ Everything lives in `./data/overheard.db`, next to its `-wal` and `-shm` files.
 sqlite3 ./data/overheard.db ".backup ./backup/overheard.db"
 ```
 
-Or stop the app and copy all three files. To upgrade, run `git pull` and `npm install`, then
-restart. Migrations run at start and only move forward, so back up before a big upgrade.
+Or stop the app and copy all three files. To upgrade, quit Overheard AI from its menu, run
+`git pull` and `npm install`, then open it from its icon. It rebuilds first, because the code
+changed. With `npm start`, run `npm run build` before you start it. Migrations run at start and
+only move forward, so back up before a big upgrade.
 
 Run one Overheard AI process per database file. Two processes would claim the same tasks and
 pay for the same answers twice.
@@ -178,9 +187,9 @@ into brands, positions and links, in a schema the request enforces. When a run f
 is scored per assistant and prompt, and brands you don't track show up as discovered
 competitors.
 
-There is no queue server or background service. Close the app and everything stops. Start it
-again and an interrupted run picks up where it left off, without buying answers it already
-stored. SQLite ships inside Node 22.13+ and Bun, so there is
+There is no queue server or background service. Quit the app and everything stops. Closing
+the browser tab does not stop it. Start it again and an interrupted run picks up where it left
+off, without buying answers it already stored. SQLite ships inside Node 22.13+ and Bun, so there is
 [nothing native to compile](docs/decisions/0001-runtime-and-sqlite-driver.md).
 
 Schedules run on a second timer in the same process. A project can run daily, weekly or
@@ -198,7 +207,23 @@ npm run start:bun      # or Bun
 ```
 
 Both serve the same `dist/` on the same address. The boot line says which SQLite driver it
-picked. `npm run test:bun` runs the tests under Bun.
+picked. `npm run test:bun` runs the tests under Bun. A second copy on a port Overheard AI
+already holds says so and stops before it opens the database.
+
+### The icon
+
+The icon runs `node server/index.mjs --open` in the app's folder. If Overheard AI already holds
+the port, that opens your browser and stops there. If not, it opens your browser at once onto
+a page that waits while the app starts. When the code is newer than the last build, as after a
+`git pull`, it rebuilds first. That never downloads anything, and Account settings can turn it
+off. With no console to read, its output goes to `data/overheard.log`.
+
+On Windows the icon starts Node through `conhost.exe --headless`, so no window appears. On a
+Mac the app keeps the `PATH` of the terminal you ran `npm run shortcut` in, so it finds `node`
+and the other command line tools you use. A Mac may ask once for access when the app's folder
+is in Documents, Desktop or Downloads. Run `npm run shortcut` again after you move the folder or reinstall Node.
+To remove the icon, delete it. [ADR 0008](docs/decisions/0008-one-click-open.md) records why it
+works this way.
 
 ## Known limitations
 

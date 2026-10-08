@@ -28,6 +28,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "start": "node --env-file-if-exists=.env server/index.mjs",
+    "shortcut": "tsx scripts/shortcut.ts",
     "start:bun": "bun server/index.mjs",
     "lint": "biome check .",
     "format": "biome check --write .",

@@ -36,7 +36,9 @@ npm run build        # vite build, import protection on
 
 `npm run format` rewrites the formatting and applies Biome's safe fixes. `server/index.mjs` is
 the one source file the typecheck skips, because it imports the build output; CI boots it after
-the build instead.
+the build instead, starts a second copy to check it stops before booting, and on each system
+runs `npm run shortcut` and opens the icon it made. The README's users start the app from that
+icon. `npm run dev` is for working on it.
 
 Bun is a supported second runtime, and CI checks it:
 

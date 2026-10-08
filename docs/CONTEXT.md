@@ -103,8 +103,12 @@ _Avoid_: sample, total answers
 ### Settings
 
 **Account settings**:
-The machine's screen: provider keys read from the environment, the run size limit, each provider's calls in flight, the database and its backups, the worker, and the demo project. Keys live here and only here, because they belong to the install, not to a project.
+The machine's screen: provider keys read from the environment, the run size limit, each provider's calls in flight, the database and its backups, the worker, how the icon opens the app, and the demo project. Keys live here and only here, because they belong to the install, not to a project.
 _Avoid_: app settings, general settings, Settings (ambiguous with the project's)
+
+**Icon**:
+The Start menu, desktop or Applications entry `npm run shortcut` adds. One click opens the app in the browser, and starts it first when it is not running.
+_Avoid_: launcher, shortcut (in UI text)
 
 **Project settings**:
 One project's screen: its brand and variants, perception prompt, schedule, extractor and extraction prompt, and its deletion. Which assistants a run asks lives in the Runner, not here.
