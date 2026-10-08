@@ -65,13 +65,19 @@ export default defineConfig({
   //
   // PORT is read here as well as in server/index.mjs, so `PORT=3100 npm run dev`
   // listens on the same port the production entry would.
+  //
+  // strictPort, because Vite otherwise moves to the next free port when this
+  // one is taken, usually by an Overheard AI the icon started, and a second
+  // process on the same database would claim the same work twice.
   server: {
     host: "127.0.0.1",
     port: Number(process.env["PORT"] ?? 3000),
+    strictPort: true,
   },
   preview: {
     host: "127.0.0.1",
     port: Number(process.env["PORT"] ?? 3000),
+    strictPort: true,
   },
   ssr: {
     external: sqliteExternals,

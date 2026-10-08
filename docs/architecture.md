@@ -43,6 +43,23 @@ The server binds `127.0.0.1` and does not read `HOST`. The `Host` test stops a b
 client on the network that can send any header it likes, so a wider bind would expose
 everything.
 
+## Starting, and the icon
+
+`server/index.mjs` takes the port before it imports the built app, because importing it boots,
+and boot recovery returns every in-flight task to the queue. The port is the lock: a second
+copy on the same port leaves before it opens the database. `vite dev` sets `strictPort` for the
+same reason. Every response carries `x-overheard-ai`, from `guarded` and from the entry's own
+waiting pages, so a second start can tell a running Overheard AI from another program.
+
+The icon `npm run shortcut` adds runs the entry with `--open`. Then a held port means: open
+the browser and leave. A free one means: open the browser at once, answer every request with a
+waiting page until the app is loaded, rebuild first when a file `vite build` reads is newer
+than `dist/server/server.js` and `app_state.rebuild_on_open` allows it, and copy all output to
+`data/overheard.log`. The entry reads that column straight from the file, before boot, because
+the app that would normally read it is the build in question. The menu's Quit ends the process
+through `quit` in `src/server/api/ops/settings.ts`. [ADR 0008](decisions/0008-one-click-open.md)
+has the reasons.
+
 ## The database
 
 One SQLite file in WAL mode, opened through the adapter below, migrated at boot. Sixteen

@@ -1,6 +1,7 @@
 /**
  * The application settings server functions: key status, the setup check,
- * where the database file is, and whether the background loops are running.
+ * where the database file is, whether the background loops are running, how
+ * the icon opens the app, and Quit.
  *
  * The setup check takes a provider name or model ids and nothing else. A key is
  * never an input or an output. Its value is read from the environment inside
@@ -105,6 +106,27 @@ export const inflightCaps = createServerFn({ method: "GET" }).handler(async () =
   const { getDb } = await import("../db/client");
   const { inflightCaps: op } = await import("./ops/settings");
   return op(getDb());
+});
+
+/** Whether the icon rebuilds a stale build before it starts the app. */
+export const rebuildOnOpen = createServerFn({ method: "GET" }).handler(async () => {
+  const { getDb } = await import("../db/client");
+  const { rebuildOnOpen: op } = await import("./ops/settings");
+  return op(getDb());
+});
+
+export const setRebuildOnOpen = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ on: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { getDb } = await import("../db/client");
+    const { setRebuildOnOpen: op } = await import("./ops/settings");
+    return op(getDb(), data.on);
+  });
+
+/** Stops the app, for the menu's Quit. */
+export const quitApp = createServerFn({ method: "POST" }).handler(async () => {
+  const { quit } = await import("./ops/settings");
+  return quit();
 });
 
 // Null clears the saved cap, so the default applies. The op checks the same

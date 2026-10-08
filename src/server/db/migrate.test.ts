@@ -37,6 +37,7 @@ const SHIPPED = [
   "0011_project_description",
   "0012_answer_model",
   "0013_model_superseded",
+  "0014_rebuild_on_open_setting",
 ];
 
 describe("migrate", () => {
@@ -165,6 +166,7 @@ describe("migrate", () => {
       "0011_project_description",
       "0012_answer_model",
       "0013_model_superseded",
+      "0014_rebuild_on_open_setting",
     ]);
 
     const count = (sql: string) => handle.prepare(sql).get<{ c: number }>()!.c;
@@ -216,6 +218,7 @@ describe("migrate", () => {
       "0011_project_description",
       "0012_answer_model",
       "0013_model_superseded",
+      "0014_rebuild_on_open_setting",
     ]);
 
     const rows = () =>
@@ -248,6 +251,7 @@ describe("migrate", () => {
       "0011_project_description",
       "0012_answer_model",
       "0013_model_superseded",
+      "0014_rebuild_on_open_setting",
     ]);
 
     const row = handle
@@ -287,6 +291,7 @@ describe("migrate", () => {
       "0011_project_description",
       "0012_answer_model",
       "0013_model_superseded",
+      "0014_rebuild_on_open_setting",
     ]);
 
     const rows = handle
@@ -324,7 +329,7 @@ describe("migrate", () => {
       )
       .run();
 
-    expect(migrate(handle)).toEqual(["0013_model_superseded"]);
+    expect(migrate(handle)).toEqual(["0013_model_superseded", "0014_rebuild_on_open_setting"]);
     const flag = (modelId: string) =>
       handle
         .prepare("SELECT superseded FROM models WHERE model_id = ?")
@@ -337,6 +342,24 @@ describe("migrate", () => {
     seedModels(handle);
     expect(flag("gpt-5.6-terra")).toBe(1);
     expect(flag("gpt-6.1-sol")).toBe(0);
+  });
+
+  it("turns rebuild on open on for an existing install, and holds the column to a flag", () => {
+    const handle = db();
+    migrate(
+      handle,
+      builtInMigrations().filter((m) => m.version < "0014"),
+    );
+
+    expect(migrate(handle)).toEqual(["0014_rebuild_on_open_setting"]);
+    const flag = () =>
+      handle
+        .prepare("SELECT rebuild_on_open FROM app_state WHERE id = 1")
+        .get<{ rebuild_on_open: number }>()?.rebuild_on_open;
+    expect(flag()).toBe(1);
+    expect(() =>
+      handle.prepare("UPDATE app_state SET rebuild_on_open = 2 WHERE id = 1").run(),
+    ).toThrow();
   });
 
   it("records nothing when a migration throws", () => {

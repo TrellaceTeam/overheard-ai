@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Driver } from "../../db/driver";
 import { freshDb } from "../../logic/test-support";
 import { stopWorker } from "../../worker/loop";
@@ -9,8 +9,12 @@ import {
   databaseInfo,
   inflightCaps,
   providerKeyStatus,
+  QUIT_DELAY_MS,
+  quit,
+  rebuildOnOpen,
   setCallLimit,
   setInflightCap,
+  setRebuildOnOpen,
   workerStatusView,
 } from "./settings";
 
@@ -198,5 +202,43 @@ describe("inflightCaps", () => {
     expect(openai().stored).toBeNull();
     setInflightCap(db, "openai", 3);
     expect(openai().stored).toBe(3);
+  });
+});
+
+describe("rebuildOnOpen", () => {
+  it("is on for a fresh install", () => {
+    expect(rebuildOnOpen(db)).toEqual({ on: true });
+  });
+
+  it("reads back what setRebuildOnOpen wrote, both ways", () => {
+    expect(setRebuildOnOpen(db, false)).toEqual({ ok: true });
+    expect(rebuildOnOpen(db)).toEqual({ on: false });
+    setRebuildOnOpen(db, true);
+    expect(rebuildOnOpen(db)).toEqual({ on: true });
+  });
+
+  it("reads as on, and saves, on a database that lost its app_state row", () => {
+    db.prepare("DELETE FROM app_state").run();
+    expect(rebuildOnOpen(db)).toEqual({ on: true });
+    setRebuildOnOpen(db, false);
+    expect(rebuildOnOpen(db)).toEqual({ on: false });
+  });
+});
+
+describe("quit", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("answers first, then stops the process", () => {
+    vi.useFakeTimers();
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    expect(quit()).toEqual({ ok: true });
+    expect(exit).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(QUIT_DELAY_MS);
+    expect(exit).toHaveBeenCalledWith(0);
   });
 });

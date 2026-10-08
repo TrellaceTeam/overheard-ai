@@ -397,6 +397,7 @@ describe("the last popup", () => {
       createElement(AppMenu, {
         projects: [{ id: "demo-1", name: "Acme Analytics" }],
         activeProjectId: "demo-1",
+        onQuit: vi.fn(),
       }),
     );
     // The drawer opened by itself: the entry is on screen without a click on
@@ -411,6 +412,7 @@ describe("the last popup", () => {
       createElement(AppMenu, {
         projects: [{ id: "demo-1", name: "Acme Analytics" }],
         activeProjectId: "demo-1",
+        onQuit: vi.fn(),
       }),
     );
     fireEvent.click(await screen.findByText("New project"));

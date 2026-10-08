@@ -221,6 +221,16 @@ describe("guarded", () => {
     expectFramingRefused(response);
   });
 
+  it("names the app on every response, so a second start knows who holds the port", async () => {
+    const passed = await guarded(local(), () => new Response("ok"));
+    const refused = await guarded(
+      new Request("http://evil.example/", { headers: { host: "evil.example" } }),
+      () => new Response("ok"),
+    );
+    expect(passed.headers.get("x-overheard-ai")).toBe("1");
+    expect(refused.headers.get("x-overheard-ai")).toBe("1");
+  });
+
   it("copies a response whose headers cannot be changed", async () => {
     const response = await guarded(local(), () =>
       Response.redirect("http://localhost:3000/start", 307),
