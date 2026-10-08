@@ -20,9 +20,11 @@ describe("windowsShortcut", () => {
   });
 
   it.runIf(process.platform === "win32")(
-    "really runs Node with .env and the entry's arguments, in the app's folder",
-    () => {
-      const root = stagedApp();
+    "really runs Node with .env and the entry's arguments, in the app's folder, and keeps it running",
+    async () => {
+      // The stand-in writes its record after a pause, so the record proves Node
+      // outlived the moment conhost returned, which some Windows builds do at once.
+      const root = stagedApp("Overheard AI", 1500);
       const shortcut = windowsShortcut(
         { node: process.execPath, root, path: "" },
         process.env["SystemRoot"] ?? "C:\\Windows",
@@ -33,11 +35,10 @@ describe("windowsShortcut", () => {
         timeout: 20_000,
       });
       expect(result.status).toBe(0);
-      expect(JSON.parse(readFileSync(join(root, "ran.json"), "utf8"))).toEqual({
-        args: ["--open"],
-        fromEnvFile: "yes",
-      });
+      const ran = await waitForFile(join(root, "ran.json"));
+      expect(JSON.parse(ran)).toEqual({ args: ["--open"], fromEnvFile: "yes" });
     },
+    30_000,
   );
 });
 
@@ -81,6 +82,7 @@ describe("macCommand", () => {
       const ran = await waitForFile(join(root, "ran.json"));
       expect(JSON.parse(ran)).toEqual({ args: ["--open"], fromEnvFile: "yes" });
     },
+    30_000,
   );
 });
 
@@ -110,23 +112,25 @@ describe("linuxDesktopEntry", () => {
 
 /**
  * A folder shaped like the app, whose server/index.mjs only records how it was
- * started: its arguments, and a value it can only have read from .env.
+ * started: its arguments, and a value it can only have read from .env. It
+ * writes the record after `delayMs`.
  */
-function stagedApp(name = "Overheard AI"): string {
+function stagedApp(name = "Overheard AI", delayMs = 0): string {
   const root = join(mkdtempSync(join(tmpdir(), "overheard-shortcut-")), name);
   mkdirSync(join(root, "server"), { recursive: true });
   writeFileSync(join(root, ".env"), "SHORTCUT_TEST=yes\n");
   writeFileSync(
     join(root, "server", "index.mjs"),
     `import { writeFileSync } from "node:fs";
-writeFileSync("ran.json", JSON.stringify({ args: process.argv.slice(2), fromEnvFile: process.env.SHORTCUT_TEST }));
+const record = { args: process.argv.slice(2), fromEnvFile: process.env.SHORTCUT_TEST };
+setTimeout(() => writeFileSync("ran.json", JSON.stringify(record)), ${delayMs});
 `,
   );
   return root;
 }
 
 async function waitForFile(path: string): Promise<string> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     try {
       return readFileSync(path, "utf8");
     } catch {
