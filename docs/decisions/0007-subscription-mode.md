@@ -27,7 +27,8 @@ scoring and the schedule. The switch happens at the one place every provider cal
 
 Each call is one fresh process of the unmodified tool:
 
-- in a new, empty temporary folder, deleted afterwards;
+- in a new temporary folder that holds only the instructions file, and the shape file on a
+  Codex extraction, deleted afterwards;
 - with the question on stdin and the instructions in a file, never on the command line;
 - with every provider API key variable removed from its environment, because Claude Code uses
   `ANTHROPIC_API_KEY` ahead of the plan sign-in and bills it at API rates, and Codex does the

@@ -69,7 +69,7 @@ tables:
 | --- | --- |
 | `models` | The assistant catalogue: provider, model id, tier, prices, whether it can search, which models can be used as extractors, and which a newer model has `superseded`. A superseded model stays callable for the projects that ask it and is never preselected. Seeded and refreshed on every boot, except `is_active`, which belongs to the user. |
 | `projects` | One brand being tracked, with the optional brand description from setup, which nothing reads back. Several projects share a file, plus at most one built-in demo project (ADR 0006), flagged and generated, never run. |
-| `app_state` | One row of install-wide facts: the tutorial state, the run size limit (`max_planned_calls`) and each provider's calls in flight (`max_inflight_<provider>`, null for the default). |
+| `app_state` | One row of install-wide facts: the tutorial state, the run size limit (`max_planned_calls`), each provider's calls in flight (`max_inflight_<provider>`, null for the default) and whether the icon rebuilds a stale build before it starts the app (`rebuild_on_open`). |
 | `brands` | The target brand and its competitors, with name variants and domains. |
 | `prompts` | The buyer questions, with a `category` that is the tag (the server requires one whenever it creates or retags a question; the column itself is nullable), an `iterations` count, an on/off flag and an archived flag. A run asks a prompt only when it is on and not archived. |
 | `project_models` | Which assistants a project asks. |

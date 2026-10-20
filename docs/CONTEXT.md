@@ -37,7 +37,7 @@ A question the project asks every selected assistant on each run. Answers to pro
 _Avoid_: query, question (for stored prompts)
 
 **Starter prompts**:
-The prompts proposed at onboarding, filled in from the brand and category, which the user can edit, or have rewritten once to fit the brand by one call on their own key.
+The prompts proposed at onboarding, filled in from the brand and category, which the user can edit, or have rewritten once to fit the brand by one call on their own key, or on their plan in subscription mode.
 _Avoid_: suggested questions, default prompts
 
 **Self-referenced prompt**:
@@ -83,13 +83,21 @@ The block at the top of the Prompts tab that holds which assistants a run asks, 
 _Avoid_: run bar, launch panel
 
 **Extraction ladder**:
-The invisible order of readers a stored answer climbs when the extraction model replies in the wrong shape or runs out of output tokens: the same provider's next tier up, then the cheapest extractor whose provider has a key, two escalations at most, every attempt logged like any extraction call. Only an exhausted ladder fails the answer.
+The invisible order of readers a stored answer climbs when the extraction model replies in the wrong shape or runs out of output tokens: the same provider's next tier up, then the cheapest extractor whose provider has a key or a plan, two escalations at most, every attempt logged like any extraction call. Only an exhausted ladder fails the answer.
 _Avoid_: fallback chain, retry ladder
+
+**Subscription mode**:
+Asking a provider through its own command line tool, Claude Code or Codex, signed in with the user's plan, instead of through its API with a key. A provider uses it while it has no key and the tool is installed. Its calls log $0 and count against the plan.
+_Avoid_: CLI mode, free mode
+
+**Plan**:
+A Claude or ChatGPT subscription that subscription mode asks through. It bills nothing per call and allows a set amount of use in each window of a few hours, which neither company publishes.
+_Avoid_: subscription (for the plan itself), account, tier
 
 ### Measuring
 
 **Setup check**:
-The check, before a project is created, that each selected assistant answers with web search using the user's key, and that the extractor works. It names the exact reason for any failure (bad key, no budget or billing, search disabled, model unavailable…).
+The check, before a project is created, that each selected assistant answers with web search using the user's key, or through its tool on the user's plan in subscription mode, and that the extractor works. It names the exact reason for any failure (bad key, no budget or billing, search disabled, model unavailable…).
 _Avoid_: key test, key check
 
 **Statistics**:

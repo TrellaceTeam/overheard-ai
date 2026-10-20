@@ -154,10 +154,10 @@ mode off for that provider.
 
 What changes:
 
-- Each call starts the tool once, in an empty temporary folder. Your own settings,
-  instructions, memory, skills and plugins are switched off, and web search is the only tool.
-  API key variables are removed from the tool's environment, so a call can't bill a key by
-  accident.
+- Each call starts the tool once, in a new temporary folder that holds only its instructions.
+  Your own settings, instructions, memory, skills and plugins are switched off, and web search
+  is the only tool. API key variables are removed from the tool's environment, so a call can't
+  bill a key by accident.
 - Each tool still tells the model a little about you, and no setting turns it off. Claude
   Code adds the email of the account you signed in with. Both add the date, your operating
   system and a folder path that contains your user name, and Codex adds your time zone. The

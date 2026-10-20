@@ -3,7 +3,8 @@
  * tool, signed in with the user's plan, instead of to the provider's API:
  * Claude Code (`claude -p`) for Anthropic and Codex (`codex exec`) for OpenAI.
  *
- * Every call is a fresh process in a fresh, empty temporary folder, so no call
+ * Every call is a fresh process in a fresh temporary folder that holds only
+ * its own instructions (and, on a Codex extraction, its shape), so no call
  * sees another's answer, a saved session or the files around the app. The
  * question goes in on stdin and the instructions in a file, and no shell
  * starts the process (see cli-command.ts), so no prompt text is ever parsed as
