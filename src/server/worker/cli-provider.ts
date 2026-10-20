@@ -430,17 +430,71 @@ const STATUS_ARGS: Record<CliProvider, string[]> = {
   openai: ["login", "status"],
 };
 
+/** A signed-in tool stays signed in, so that answer is reused for this long. */
+const SIGNED_IN_FRESH_MS = 60_000;
 /**
- * Whether the tool is signed in, from its own status command, which makes no
- * model call. `claude auth status` prints JSON with `loggedIn`, and `codex
- * login status` prints "Logged in using ChatGPT" or "Not logged in" on stderr.
- * Both exit 1 signed out. Null when the answer cannot be read, so a version
- * whose status command changed is never shown as signed out. It runs with a
- * call's environment, so CLAUDE_CONFIG_DIR and CODEX_HOME pick the same
- * account a call uses. Only the yes or no leaves this function: Claude Code's
- * status also prints the account's email.
+ * Any answer, and a read still running, is shared for this long, so a burst
+ * of key status reads, a page's or another site's, starts one process.
  */
-export async function cliSignedIn(target: CliTarget): Promise<boolean | null> {
+const ANY_FRESH_MS = 2_000;
+
+interface SignInRead {
+  at: number;
+  value: Promise<boolean | null>;
+  result?: boolean | null;
+}
+
+// On globalThis, like the model list cache, so a dev hot reload keeps it.
+const SIGN_IN_KEY = Symbol.for("overheard.cliSignIn");
+type SignInGlobal = typeof globalThis & { [SIGN_IN_KEY]?: Map<string, SignInRead> };
+
+function signInReads(): Map<string, SignInRead> {
+  const holder = globalThis as SignInGlobal;
+  holder[SIGN_IN_KEY] ??= new Map();
+  return holder[SIGN_IN_KEY];
+}
+
+/** Forget every status read. For tests. */
+export function clearSignInCache(): void {
+  signInReads().clear();
+}
+
+/**
+ * Whether the tool is signed in to a plan, from its own status command, which
+ * makes no model call. It runs with a call's environment, so CLAUDE_CONFIG_DIR
+ * and CODEX_HOME pick the same account a call uses. A signed-out answer is
+ * read again after two seconds, so signing in shows on the next check, and a
+ * signed-in one after a minute.
+ */
+export function cliSignedIn(target: CliTarget): Promise<boolean | null> {
+  const home = process.env[target.provider === "anthropic" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME"];
+  const key = [target.provider, target.command, home ?? ""].join("\0");
+  const now = Date.now();
+  const held = signInReads().get(key);
+  if (
+    held &&
+    (now - held.at < ANY_FRESH_MS || (held.result === true && now - held.at < SIGNED_IN_FRESH_MS))
+  ) {
+    return held.value;
+  }
+  const read: SignInRead = { at: now, value: readSignIn(target) };
+  void read.value.then((result) => {
+    read.result = result;
+  });
+  signInReads().set(key, read);
+  return read.value;
+}
+
+/**
+ * `claude auth status` prints JSON with `loggedIn`, and `codex login status`
+ * prints "Logged in using ChatGPT" or "Not logged in" on stderr. Both exit 1
+ * signed out. Codex signed in another way, such as with an API key, bills
+ * that and not a plan, so only ChatGPT counts. Null when the answer cannot be
+ * read, so a version whose status command changed is never shown as signed
+ * out. Only the yes or no leaves here: Claude Code's status also prints the
+ * account's email.
+ */
+async function readSignIn(target: CliTarget): Promise<boolean | null> {
   const lookup = lookupLaunch(target.command);
   if (!lookup.found) return null;
   const exit = await runProcess(lookup.launch, STATUS_ARGS[target.provider], {
@@ -461,7 +515,7 @@ export async function cliSignedIn(target: CliTarget): Promise<boolean | null> {
     }
   }
   if (/not logged in/i.test(text)) return false;
-  return target.provider === "openai" && /\blogged in\b/i.test(text) ? true : null;
+  return target.provider === "openai" && /logged in using chatgpt/i.test(text) ? true : null;
 }
 
 /** Long enough for Codex to read its catalogue, short enough not to hold the key panel. */

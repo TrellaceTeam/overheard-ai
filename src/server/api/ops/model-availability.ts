@@ -113,8 +113,10 @@ export async function modelAvailability(
       const cli = providerCli(provider);
       if (cli) {
         // `codex debug models` answers signed out too, and a list then would
-        // read as the plan's.
-        if ((await cliSignedIn(cli)) === false) return [provider, { status: "cli" }];
+        // read as the plan's. Claude Code has no list, so it needs no check.
+        if (cli.provider === "openai" && (await cliSignedIn(cli)) === false) {
+          return [provider, { status: "cli" }];
+        }
         const listed = await listFor(provider, `cli:${cli.command}`, force, async () => {
           const ids = await listCliModels(cli);
           if (ids === null) throw new Error("NO_MODEL_LIST");

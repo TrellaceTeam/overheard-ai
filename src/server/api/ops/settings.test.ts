@@ -84,7 +84,7 @@ describe("providerKeyStatus", () => {
       signedIn: false,
     });
     // Claude Code's status names the account, and none of it leaves the server.
-    expect(JSON.stringify(rows)).not.toContain("authMethod");
+    expect(JSON.stringify(rows)).not.toContain("example.invalid");
   });
 });
 

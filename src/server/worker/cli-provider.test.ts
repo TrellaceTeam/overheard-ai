@@ -1,12 +1,13 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   callCli,
   type CliCall,
   claudeArgs,
   classifyCliFailure,
+  clearSignInCache,
   cliSignedIn,
   codexArgs,
   readClaude,
@@ -257,6 +258,8 @@ describe("classifyCliFailure", () => {
 });
 
 describe("cliSignedIn", () => {
+  beforeEach(clearSignInCache);
+
   const anthropic = (source: string) => ({
     provider: "anthropic" as const,
     command: standInCommand(source),
@@ -294,6 +297,64 @@ describe("cliSignedIn", () => {
     expect(
       await cliSignedIn({ provider: "openai", command: "overheard-no-such-command" }),
     ).toBeNull();
+  });
+
+  it("does not count Codex signed in another way as on a plan, since that bills a key", async () => {
+    for (const line of [
+      "Logged in using an API key",
+      "Logged in using access token",
+      "Logged in using Amazon Bedrock API key",
+    ]) {
+      expect(
+        await cliSignedIn(openai(`process.stderr.write(${JSON.stringify(`${line}\n`)});`)),
+        line,
+      ).toBeNull();
+    }
+  });
+
+  it("asks the account CLAUDE_CONFIG_DIR points at, as a call does", async () => {
+    const tool = anthropic(
+      `process.stdout.write(JSON.stringify({ loggedIn: process.env.CLAUDE_CONFIG_DIR === "second-account" }));`,
+    );
+    expect(await cliSignedIn(tool)).toBe(false);
+    process.env["CLAUDE_CONFIG_DIR"] = "second-account";
+    try {
+      expect(await cliSignedIn(tool)).toBe(true);
+    } finally {
+      delete process.env["CLAUDE_CONFIG_DIR"];
+    }
+  });
+
+  it("starts one process for a burst, and asks a signed-out tool again sooner than a signed-in one", async () => {
+    const count = join(mkdtempSync(join(tmpdir(), "overheard-count-")), "count");
+    writeFileSync(count, "");
+    const counting = (loggedIn: boolean) =>
+      anthropic(
+        `require("node:fs").appendFileSync(${JSON.stringify(count)}, "x"); process.stdout.write(JSON.stringify({ loggedIn: ${loggedIn} }));`,
+      );
+    const runs = () => readFileSync(count, "utf8").length;
+    const now = vi.spyOn(Date, "now");
+    try {
+      const signedOut = counting(false);
+      now.mockReturnValue(1_000_000);
+      await Promise.all([cliSignedIn(signedOut), cliSignedIn(signedOut), cliSignedIn(signedOut)]);
+      expect(runs()).toBe(1);
+      now.mockReturnValue(1_002_500);
+      await cliSignedIn(signedOut);
+      expect(runs()).toBe(2);
+
+      const signedIn = counting(true);
+      now.mockReturnValue(2_000_000);
+      await cliSignedIn(signedIn);
+      now.mockReturnValue(2_030_000);
+      expect(await cliSignedIn(signedIn)).toBe(true);
+      expect(runs()).toBe(3);
+      now.mockReturnValue(2_061_000);
+      await cliSignedIn(signedIn);
+      expect(runs()).toBe(4);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 
