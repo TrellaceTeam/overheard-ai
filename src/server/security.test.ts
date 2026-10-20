@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  APP_HEADER,
   assertLocalRequest,
   checkLocalRequest,
   guarded,
@@ -219,6 +222,27 @@ describe("guarded", () => {
     expect(called).toBe(false);
     expect(response.status).toBe(403);
     expectFramingRefused(response);
+  });
+
+  it("names the app on every response, so a second start knows who holds the port", async () => {
+    const passed = await guarded(local(), () => new Response("ok"));
+    const refused = await guarded(
+      new Request("http://evil.example/", { headers: { host: "evil.example" } }),
+      () => new Response("ok"),
+    );
+    expect(passed.headers.get("x-overheard-ai")).toBe("1");
+    expect(refused.headers.get("x-overheard-ai")).toBe("1");
+  });
+
+  it("names the app with the header the server entry looks for", () => {
+    // server/index.mjs sends and reads it before the build that holds this
+    // module is loaded, so it writes the name out again, and the typecheck
+    // skips that file.
+    const entry = readFileSync(
+      fileURLToPath(new URL("../../server/index.mjs", import.meta.url)),
+      "utf8",
+    );
+    expect(entry).toContain(`const APP_HEADER = ${JSON.stringify(APP_HEADER)};`);
   });
 
   it("copies a response whose headers cannot be changed", async () => {

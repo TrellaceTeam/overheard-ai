@@ -83,6 +83,7 @@ import {
 } from "./queries";
 import { writePerceptionSummary } from "../logic/perception-summary";
 import { INFLIGHT_CAP_MAX } from "@/lib/inflight-caps";
+import { standInCommand } from "./cli-test-support";
 
 const db = {} as Driver;
 
@@ -156,6 +157,8 @@ function task(patch: Partial<RunTaskRow> = {}): RunTaskRow {
     provider_cost_usd: null,
     error: null,
     failure_code: null,
+    retry_failure_code: null,
+    retry_error: null,
     created_at: "2026-01-01T00:00:00.000Z",
     ...patch,
   };
@@ -1237,6 +1240,23 @@ describe("costOf", () => {
       searchCalls: 0,
     });
     expect(cost).toBe(1);
+  });
+
+  it("prices a call on a plan at nothing, because the plan bills per month, not per call", () => {
+    // A key wins over the plan, and this file keeps keys set for the passes.
+    const key = process.env["ANTHROPIC_API_KEY"];
+    delete process.env["ANTHROPIC_API_KEY"];
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
+    try {
+      const planModel = { ...(model as object), provider: "anthropic" } as never;
+      expect(costOf(planModel, { inputTokens: 1_000_000, outputTokens: 0, searchCalls: 1 })).toBe(
+        0,
+      );
+      expect(worstCaseCost(planModel, "answer")).toBe(0);
+    } finally {
+      delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+      if (key !== undefined) process.env["ANTHROPIC_API_KEY"] = key;
+    }
   });
 
   it("prices a mock call at nothing, because the seam bills nothing", () => {

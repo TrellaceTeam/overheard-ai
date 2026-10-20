@@ -9,8 +9,9 @@
  *   was spent;
  * - a call that may have billed and reported nothing logs the worst case,
  *   sized from what was sent, so a very long prompt is not undercounted;
- * - nothing billed is logged as zero, and under the mock provider mode every
- *   logged cost is zero, because the mock bills nothing;
+ * - nothing billed is logged as zero, and under the mock provider mode or a
+ *   plan in subscription mode every logged cost is zero, because neither
+ *   bills per call;
  * - an empty reply is a refusal with its spend logged, because the call
  *   happened;
  * - a provider message reaches the user scrubbed of key-shaped strings.
@@ -18,8 +19,8 @@
 import type { Driver } from "../../db/driver";
 import type { ModelRow } from "../../db/types";
 import { recordUsageEvent } from "../../logic/usage";
+import { billsNothing, providerCli } from "../../worker/keys";
 import { costOf, mayHaveBilled } from "../../worker/pass";
-import { mockProvidersEnabled } from "../../worker/mock-provider";
 import {
   callExtractionModel,
   ProviderError,
@@ -44,10 +45,11 @@ const OVERHEAD_TOKENS = 250;
  *
  * Not zeroed under the mock provider mode, like the wizard's run estimate. The
  * logged cost of a mock call is zero (costOf returns 0), but the preview still
- * shows what a real summary would cost.
+ * shows what a real summary would cost. Zeroed in subscription mode, where a
+ * real summary costs nothing per call either.
  */
 export function estimateSummaryCost(model: ModelRow | null, totalChars: number): number {
-  if (!model) return 0;
+  if (!model || providerCli(model.provider)) return 0;
   const inputTokens = Math.ceil(totalChars / 4) + OVERHEAD_TOKENS;
   return (
     (inputTokens / 1_000_000) * Number(model.input_price_per_mtok) +
@@ -87,7 +89,7 @@ export interface BoughtProse {
  * in the same way. Zero under the mock provider mode, like every logged cost.
  */
 function worstCaseProseCost(model: ModelRow, sentChars: number): number {
-  if (mockProvidersEnabled()) return 0;
+  if (billsNothing(model.provider)) return 0;
   return (
     estimateSummaryCost(model, sentChars) +
     (SUMMARY_MAX_TOKENS / 1_000_000) * Number(model.output_price_per_mtok)

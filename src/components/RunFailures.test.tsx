@@ -55,6 +55,17 @@ describe("RunFailures", () => {
     expect(screen.getByText("Open Account settings")).toBeDefined();
   });
 
+  it("says who pays for a retry: keys by default, the plan when the route says so", () => {
+    const { container, rerender } = render(<RunFailures tasks={[task()]} onRetry={() => {}} />);
+    expect(container.textContent).toContain(
+      "Only the answers that failed are collected again, on your own keys.",
+    );
+    rerender(<RunFailures tasks={[task()]} onRetry={() => {}} payer="on your Claude plan" />);
+    expect(container.textContent).toContain(
+      "Only the answers that failed are collected again, on your Claude plan.",
+    );
+  });
+
   it("hands the retry back to the route", () => {
     const onRetry = vi.fn();
     render(<RunFailures tasks={[task()]} onRetry={onRetry} />);

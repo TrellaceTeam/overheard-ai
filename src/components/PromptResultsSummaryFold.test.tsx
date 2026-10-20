@@ -74,6 +74,22 @@ describe("PromptResultsSummaryFold", () => {
     expect(screen.queryByText(/Outdated summary/)).toBeNull();
   });
 
+  it("says who pays for the summary: keys by default, the plan when the route says so", () => {
+    const { container, rerender } = render(
+      <PromptResultsSummaryFold row={unasked} onAsk={() => {}} />,
+    );
+    openFold();
+    expect(container.textContent).toContain(
+      "Written on demand by your extraction model, on your own keys · never counted in statistics",
+    );
+    rerender(
+      <PromptResultsSummaryFold row={unasked} onAsk={() => {}} payer="on your ChatGPT plan" />,
+    );
+    expect(container.textContent).toContain(
+      "Written on demand by your extraction model, on your ChatGPT plan · never counted in statistics",
+    );
+  });
+
   it("explains the newest-first budget behind an info button", async () => {
     render(<PromptResultsSummaryFold row={unasked} onAsk={() => {}} />);
     openFold();

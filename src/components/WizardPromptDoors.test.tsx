@@ -36,6 +36,21 @@ describe("WizardPromptDoors", () => {
     expect(onGenerate).toHaveBeenCalledOnce();
   });
 
+  it("on a plan: names the plan in the line and on the button, with no price", () => {
+    render(
+      <WizardPromptDoors
+        payer="on your ChatGPT plan"
+        button={{ state: "armed", costUsd: 0, plan: "ChatGPT", onGenerate: () => {} }}
+      />,
+    );
+    expect(
+      screen.getByText(/generate a set tailored to your brand on your ChatGPT plan\./),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Generate custom prompts on your ChatGPT plan" }),
+    ).toBeDefined();
+  });
+
   it("generating: says so and takes no second press", () => {
     const onGenerate = vi.fn();
     renderIn({ state: "generating", costUsd: 0.014, onGenerate });

@@ -1,16 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Driver } from "../../db/driver";
 import { freshDb } from "../../logic/test-support";
 import { stopWorker } from "../../worker/loop";
 import { stopScheduler } from "../../worker/scheduler-loop";
 import { INFLIGHT_CAP_ENV } from "../../worker/concurrency";
+import { SIGNED_IN_TOOL, SIGNED_OUT_TOOL, standInCommand } from "../../worker/cli-test-support";
 import {
   callLimit,
   databaseInfo,
   inflightCaps,
   providerKeyStatus,
+  QUIT_DELAY_MS,
+  quit,
+  rebuildOnOpen,
   setCallLimit,
   setInflightCap,
+  setRebuildOnOpen,
   workerStatusView,
 } from "./settings";
 
@@ -39,9 +44,14 @@ afterEach(() => {
 });
 
 describe("providerKeyStatus", () => {
-  it("reports booleans and never a value", () => {
+  afterEach(() => {
+    delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+    delete process.env["OVERHEARD_OPENAI_CLI"];
+  });
+
+  it("reports booleans and never a value", async () => {
     process.env["OPENAI_API_KEY"] = "sk-not-a-real-key";
-    const status = providerKeyStatus();
+    const status = await providerKeyStatus();
 
     expect(status).toEqual([
       { provider: "openai", configured: true, source: "env", problem: null },
@@ -51,14 +61,30 @@ describe("providerKeyStatus", () => {
     expect(JSON.stringify(status)).not.toContain("sk-");
   });
 
-  it("accepts GEMINI_API_KEY as the Google alias", () => {
+  it("accepts GEMINI_API_KEY as the Google alias", async () => {
     process.env["GEMINI_API_KEY"] = "a-google-key";
-    const configured = providerKeyStatus().filter((row) => row.configured);
+    const configured = (await providerKeyStatus()).filter((row) => row.configured);
     expect(configured.map((row) => row.provider)).toEqual(["google"]);
   });
 
-  it("reports nothing configured when the environment is empty", () => {
-    expect(providerKeyStatus().some((row) => row.configured)).toBe(false);
+  it("reports nothing configured when the environment is empty", async () => {
+    expect((await providerKeyStatus()).some((row) => row.configured)).toBe(false);
+  });
+
+  it("says whether each plan's tool is signed in, from its status command alone", async () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand(SIGNED_IN_TOOL);
+    process.env["OVERHEARD_OPENAI_CLI"] = standInCommand(SIGNED_OUT_TOOL);
+    const rows = await providerKeyStatus();
+    expect(rows.find((row) => row.provider === "anthropic")).toMatchObject({
+      source: "cli",
+      signedIn: true,
+    });
+    expect(rows.find((row) => row.provider === "openai")).toMatchObject({
+      source: "cli",
+      signedIn: false,
+    });
+    // Claude Code's status names the account, and none of it leaves the server.
+    expect(JSON.stringify(rows)).not.toContain("example.invalid");
   });
 });
 
@@ -198,5 +224,43 @@ describe("inflightCaps", () => {
     expect(openai().stored).toBeNull();
     setInflightCap(db, "openai", 3);
     expect(openai().stored).toBe(3);
+  });
+});
+
+describe("rebuildOnOpen", () => {
+  it("is on for a fresh install", () => {
+    expect(rebuildOnOpen(db)).toEqual({ on: true });
+  });
+
+  it("reads back what setRebuildOnOpen wrote, both ways", () => {
+    expect(setRebuildOnOpen(db, false)).toEqual({ ok: true });
+    expect(rebuildOnOpen(db)).toEqual({ on: false });
+    setRebuildOnOpen(db, true);
+    expect(rebuildOnOpen(db)).toEqual({ on: true });
+  });
+
+  it("reads as on, and saves, on a database that lost its app_state row", () => {
+    db.prepare("DELETE FROM app_state").run();
+    expect(rebuildOnOpen(db)).toEqual({ on: true });
+    setRebuildOnOpen(db, false);
+    expect(rebuildOnOpen(db)).toEqual({ on: false });
+  });
+});
+
+describe("quit", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("answers first, then stops the process", () => {
+    vi.useFakeTimers();
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    expect(quit()).toEqual({ ok: true });
+    expect(exit).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(QUIT_DELAY_MS);
+    expect(exit).toHaveBeenCalledWith(0);
   });
 });

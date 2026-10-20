@@ -1,10 +1,25 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "./driver";
+import { DEFAULT_DATABASE_PATH, openDatabase } from "./driver";
 
 const expectedModule =
   typeof (globalThis as { Bun?: unknown }).Bun !== "undefined" ? "bun:sqlite" : "node:sqlite";
 
 describe("sqlite driver adapter", () => {
+  it("has the default path the server entry reads before boot", () => {
+    // server/index.mjs reads the rebuild switch before the build that holds
+    // this module is loaded, so it cannot import the constant and writes it
+    // out again. The typecheck skips that file, so this ties the two.
+    const entry = readFileSync(
+      fileURLToPath(new URL("../../../server/index.mjs", import.meta.url)),
+      "utf8",
+    );
+    expect(entry).toContain(
+      `process.env.DATABASE_PATH ?? ${JSON.stringify(DEFAULT_DATABASE_PATH)}`,
+    );
+  });
+
   it("binds to the built-in driver of the current runtime", () => {
     const db = openDatabase(":memory:");
     try {

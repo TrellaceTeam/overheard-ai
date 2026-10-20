@@ -56,6 +56,7 @@ export function PromptResultsSummaryFold({
   row,
   busy = false,
   locked = null,
+  payer = "on your own keys",
   onAsk,
 }: {
   row: PromptResultsFoldRow;
@@ -63,6 +64,8 @@ export function PromptResultsSummaryFold({
   busy?: boolean | undefined;
   /** When set, asking is unavailable and this says why (the demo project). */
   locked?: string | null | undefined;
+  /** Who pays for the summary call (lib/plan-spend). */
+  payer?: string | undefined;
   onAsk: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -138,7 +141,7 @@ export function PromptResultsSummaryFold({
             <p className="num type-meta">
               {saved
                 ? `Written ${new Date(saved.createdAt).toLocaleString()} · never counted in statistics`
-                : "Written on demand by your extraction model, on your own keys · never counted in statistics"}
+                : `Written on demand by your extraction model, ${payer} · never counted in statistics`}
             </p>
           </div>
         </div>

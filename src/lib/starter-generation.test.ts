@@ -13,7 +13,7 @@ import {
   STARTER_PROMPTS_SHAPE,
   starterGenerationChars,
   starterGenerationUserPrompt,
-  THREE_DOORS_LINE,
+  threeDoorsLine,
 } from "./starter-generation";
 
 /** A catalogue row with only the columns the rule reads. Prices in USD per million tokens. */
@@ -344,8 +344,17 @@ describe("the generate button", () => {
   });
 
   it("names the three doors in one line", () => {
-    expect(THREE_DOORS_LINE).toBe(
+    expect(threeDoorsLine()).toBe(
       "These prompts are a starting point. Keep them, edit them by hand, or generate a set tailored to your brand on your own keys.",
+    );
+  });
+
+  it("says a generation on a plan counts against it, with no price", () => {
+    expect(threeDoorsLine("on your ChatGPT plan")).toBe(
+      "These prompts are a starting point. Keep them, edit them by hand, or generate a set tailored to your brand on your ChatGPT plan.",
+    );
+    expect(generateButtonLabel("armed", 0, "ChatGPT")).toBe(
+      "Generate custom prompts on your ChatGPT plan",
     );
   });
 });

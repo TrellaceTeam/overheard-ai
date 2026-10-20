@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { effectiveCaps, envCap, INFLIGHT_CAP_ENV, type StoredCaps } from "./concurrency";
 import { DEFAULT_PROVIDER_CAPS } from "../logic/claim-tasks";
+import { standInCommand } from "./cli-test-support";
 
 const NAMES = Object.values(INFLIGHT_CAP_ENV);
 const NOTHING_SAVED: StoredCaps = { openai: null, anthropic: null, google: null };
@@ -50,6 +51,17 @@ describe("effectiveCaps", () => {
 
   it("does not hold a variable to the saved cap's upper bound", () => {
     expect(effectiveCaps(NOTHING_SAVED, { [INFLIGHT_CAP_ENV["openai"]]: "40" }).openai).toBe(40);
+  });
+
+  it("starts a provider in subscription mode lower, and still lets a saved cap win", () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
+    try {
+      expect(effectiveCaps(NOTHING_SAVED, {}).anthropic).toBe(3);
+      expect(effectiveCaps({ ...NOTHING_SAVED, anthropic: 5 }, {}).anthropic).toBe(5);
+      expect(effectiveCaps(NOTHING_SAVED, {}).openai).toBe(DEFAULT_PROVIDER_CAPS["openai"]);
+    } finally {
+      delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+    }
   });
 });
 

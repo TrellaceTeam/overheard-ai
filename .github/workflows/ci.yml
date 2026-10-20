@@ -92,12 +92,81 @@ jobs:
           test "$status" = "403"
           echo "foreign Host refused on a static file"
           grep "\[boot\] Overheard AI ready" server.log
+          # A second copy on the same port says so and stops before it boots.
+          status=0
+          node server/index.mjs > second.log 2>&1 || status=$?
+          test "$status" = "1"
+          grep "already running" second.log
+          if grep -q "\[boot\]" second.log; then echo "the second copy booted"; exit 1; fi
+          echo "second copy stopped before booting"
+          # Started the way the icon starts it, it hands over to the running copy.
+          BROWSER=none node server/index.mjs --open > third.log 2>&1
+          grep "already running" third.log
+          echo "second --open handed over"
           kill "$server_pid" || true
 
       - name: Server log
         if: always()
         shell: bash
         run: cat server.log || true
+
+      # `npm run shortcut` makes the icon and starts the app the way the icon
+      # does, reading .env from the app's folder. Then each system opens the
+      # icon itself: Windows through the shortcut, macOS through the app.
+      - name: Make the icon and start the app with it
+        shell: bash
+        env:
+          BROWSER: none
+        run: |
+          printf 'PORT=3902\nDATABASE_PATH=./data/ci-icon.db\nOVERHEARD_MOCK_PROVIDERS=1\n' > .env
+          npm run shortcut
+          curl --fail --silent --show-error \
+               --retry 30 --retry-delay 2 --retry-connrefused \
+               --output /dev/null http://127.0.0.1:3902/start
+          grep "\[boot\] Overheard AI ready" data/overheard.log
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            grep '^Exec=env "PATH=' "$HOME/.local/share/applications/overheard-ai.desktop"
+          fi
+
+      - name: Stop the app
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3902 -State Listen | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force }"
+          else
+            kill $(lsof -ti tcp:3902 -sTCP:LISTEN)
+          fi
+          sleep 2
+          if curl --silent --output /dev/null http://127.0.0.1:3902/start; then echo "still running"; exit 1; fi
+
+      - name: Open the Windows shortcut
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          BROWSER: none
+        run: |
+          $link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Overheard AI.lnk'
+          Start-Process $link
+          curl.exe --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused --output NUL http://127.0.0.1:3902/start
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-NetTCPConnection -LocalPort 3902 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+
+      # Opened from LaunchServices, the app gets no environment from this step,
+      # so it opens Safari on the runner. That is harmless here.
+      - name: Open the Mac app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          open "$HOME/Applications/Overheard AI.app"
+          curl --fail --silent --show-error \
+               --retry 30 --retry-delay 2 --retry-connrefused \
+               --output /dev/null http://127.0.0.1:3902/start
+          kill $(lsof -ti tcp:3902 -sTCP:LISTEN)
+
+      - name: Icon log
+        if: always()
+        shell: bash
+        run: cat data/overheard.log || true
 
   bun:
     name: Bun on ubuntu-latest

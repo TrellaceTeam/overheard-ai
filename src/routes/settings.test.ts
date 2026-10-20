@@ -33,6 +33,8 @@ vi.mock("@/server/api/settings", () => ({
   setCallLimit: () => new Promise<never>(() => {}),
   inflightCaps: () => new Promise<never>(() => {}),
   setInflightCap: () => new Promise<never>(() => {}),
+  rebuildOnOpen: () => new Promise<never>(() => {}),
+  setRebuildOnOpen: () => new Promise<never>(() => {}),
   setupCheck: () => new Promise<never>(() => {}),
 }));
 

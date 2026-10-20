@@ -158,6 +158,14 @@ export interface RunTaskRow {
    * which classify from the prose.
    */
   failure_code: string | null;
+  /**
+   * The code and detail of the last attempt that failed and was retried, in
+   * the same forms as `failure_code` and `error`. Kept when the task later
+   * succeeds, which clears those two. Null on a task that never retried, and
+   * on rows written before migration 0015.
+   */
+  retry_failure_code: string | null;
+  retry_error: string | null;
   created_at: string;
 }
 

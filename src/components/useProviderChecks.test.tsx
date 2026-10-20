@@ -51,6 +51,7 @@ describe("useProviderChecks", () => {
         configured: true,
         source: "env",
         problem: null,
+        signedIn: null,
         result: { state: "untested" },
       },
       {
@@ -58,6 +59,7 @@ describe("useProviderChecks", () => {
         configured: false,
         source: "none",
         problem: null,
+        signedIn: null,
         result: { state: "untested" },
       },
     ] satisfies KeyStatus[]);

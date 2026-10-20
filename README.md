@@ -33,13 +33,22 @@ git clone https://github.com/TrellaceTeam/overheard-ai.git
 cd overheard-ai
 npm install
 cp .env.example .env        # then paste at least one API key into .env
-npm run dev
+npm run shortcut
 ```
+
+No API key, but a Claude or ChatGPT plan? See
+[subscription mode](#subscription-mode-a-claude-or-chatgpt-plan-instead-of-a-key-beta).
 
 In Windows PowerShell, type `npm.cmd` wherever this page says `npm`. PowerShell's default
 execution policy refuses to run `npm`.
 
-Open http://127.0.0.1:3000.
+`npm run shortcut` adds an Overheard AI icon to the Start menu and the desktop on Windows, to
+Applications on a Mac, or to the apps menu on Linux. Then it opens the app in your browser at
+http://127.0.0.1:3000.
+
+From then on, click the icon. It opens the app when it is running and starts it first when it
+is not, with no terminal. Closing the tab leaves the app running, so a bookmark works until
+you quit it or restart the computer. Quit Overheard AI in the app's menu stops it.
 
 No key yet? Start it anyway. The first launch walks you through a demo project with six months of
 generated history. It makes no API calls and costs nothing.
@@ -55,7 +64,8 @@ In Windows PowerShell, run npm.cmd wherever these steps say npm.
 2. git clone https://github.com/TrellaceTeam/overheard-ai.git, then cd overheard-ai
 3. npm install
 4. Copy .env.example to .env. Leave every key empty: I will add mine myself.
-5. Start `npm run dev` in the background, since it keeps running. Tell me the address it prints.
+5. npm run shortcut. It adds an Overheard AI icon and opens the app in my browser. Tell me
+   where it put the icon.
 Never write an API key into a file, a command or a message. If a step fails, show me the
 error and stop.
 ```
@@ -122,6 +132,59 @@ models your key can use, and the setup screen will not tick one it cannot.
 `.env.example` lists the other settings: the database path, the port, and how many calls each
 provider may have in flight.
 
+### Subscription mode: a Claude or ChatGPT plan instead of a key (beta)
+
+If you have a Claude or ChatGPT plan, Overheard AI can ask through the command line tool you
+already sign in to: Claude Code for Anthropic, Codex for OpenAI. Calls then count against
+your plan's usage limits instead of a bill.
+
+1. Install [Claude Code](https://code.claude.com/docs/en/setup) or
+   [Codex](https://developers.openai.com/codex/cli), and sign in with your plan:
+   `claude auth login`, or `codex login` with "Sign in with ChatGPT".
+2. Leave that provider's API key empty. The `.env` you copied from `.env.example` already
+   names both commands, and Overheard AI uses one whenever its provider has no key and the
+   command is installed. A key, when set, wins.
+3. Account settings now shows "via claude, on your Claude plan". Its Check button makes one
+   real call with web search through the tool, and the ChatGPT row lists the models your
+   plan offers. A tool that is installed but not signed in says so, with the command to run.
+
+If the app runs where the command isn't on your PATH, such as a scheduled task, put its full
+path in `OVERHEARD_ANTHROPIC_CLI` or `OVERHEARD_OPENAI_CLI`. Empty either line to turn the
+mode off for that provider.
+
+What changes:
+
+- Each call starts the tool once, in a new temporary folder that holds only its instructions.
+  Your own settings, instructions, memory, skills and plugins are switched off, and web search
+  is the only tool. API key variables are removed from the tool's environment, so a call can't
+  bill a key by accident.
+- Each tool still tells the model a little about you, and no setting turns it off. Claude
+  Code adds the email of the account you signed in with. Both add the date, your operating
+  system and a folder path that contains your user name, and Codex adds your time zone. The
+  email can tilt answers in your own category, because its domain names your company. To
+  avoid that, sign the tool in with a separate account whose email doesn't name your
+  company. With an API key, the model gets only the app's instructions and the question.
+- Spend shows $0. Calls count against your plan's limits instead, which neither company
+  publishes. When a plan hits its limit, the run page says so on the calls that failed. Retry
+  them once it resets. A provider in subscription mode starts at 3
+  calls in flight.
+- The models are the same, but each tool searches its own way. In testing, Claude Code ran one
+  or two searches per answer, where the API path allows up to five. Codex sends its own agent
+  instructions along with yours, plus your `~/.codex/AGENTS.md` if you keep one. Account
+  settings warns about that file. A trend that mixes API runs and plan runs compares two
+  slightly different measurements.
+- Google has no subscription mode yet.
+- Plans are sized for one person's own use, and both companies recommend API keys for
+  automated work. Read [Anthropic's](https://code.claude.com/docs/en/legal-and-compliance) and
+  [OpenAI's](https://developers.openai.com/codex/auth) terms for your plan before you turn this
+  on. Use API keys to measure brands for anyone else.
+- Tested with Claude Code 2.1.284 and 2.1.285 and Codex 0.160.1 and 0.163.0. If a tool
+  refuses a setting, the setup check and the run page say so. Update it with `claude update`
+  or `npm install -g @openai/codex@latest`, or the way you installed it. An old install can
+  also fail before it answers at all, and updating fixes that too.
+
+[ADR 0007](docs/decisions/0007-subscription-mode.md) records why it works this way.
+
 ## What a run costs
 
 Each answer takes two calls. One asks the prompt. The other, to a cheaper extraction model,
@@ -149,8 +212,10 @@ Everything lives in `./data/overheard.db`, next to its `-wal` and `-shm` files.
 sqlite3 ./data/overheard.db ".backup ./backup/overheard.db"
 ```
 
-Or stop the app and copy all three files. To upgrade, run `git pull` and `npm install`, then
-restart. Migrations run at start and only move forward, so back up before a big upgrade.
+Or stop the app and copy all three files. To upgrade, quit Overheard AI from its menu, run
+`git pull` and `npm install`, then open it from its icon. It rebuilds first, because the code
+changed. With `npm start`, run `npm run build` before you start it. Migrations run at start and
+only move forward, so back up before a big upgrade.
 
 Run one Overheard AI process per database file. Two processes would claim the same tasks and
 pay for the same answers twice.
@@ -162,7 +227,8 @@ pay for the same answers twice.
   framed.
 - Keys stay on the server. They never reach the browser, the database or a log, and the app
   never writes to `.env`.
-- The only outbound traffic goes to the providers you have keys for.
+- The only outbound traffic goes to the providers you have keys for, or through the
+  command line tools you set for subscription mode.
 - There is no login. Anyone who can reach the port can read every answer and spend your keys,
   so don't put it on a public address.
 
@@ -178,9 +244,9 @@ into brands, positions and links, in a schema the request enforces. When a run f
 is scored per assistant and prompt, and brands you don't track show up as discovered
 competitors.
 
-There is no queue server or background service. Close the app and everything stops. Start it
-again and an interrupted run picks up where it left off, without buying answers it already
-stored. SQLite ships inside Node 22.13+ and Bun, so there is
+There is no queue server or background service. Quit the app and everything stops. Closing
+the browser tab does not stop it. Start it again and an interrupted run picks up where it left
+off, without buying answers it already stored. SQLite ships inside Node 22.13+ and Bun, so there is
 [nothing native to compile](docs/decisions/0001-runtime-and-sqlite-driver.md).
 
 Schedules run on a second timer in the same process. A project can run daily, weekly or
@@ -198,7 +264,24 @@ npm run start:bun      # or Bun
 ```
 
 Both serve the same `dist/` on the same address. The boot line says which SQLite driver it
-picked. `npm run test:bun` runs the tests under Bun.
+picked. `npm run test:bun` runs the tests under Bun. A second copy on a port Overheard AI
+already holds says so and stops before it opens the database.
+
+### The icon
+
+The icon runs `node server/index.mjs --open` in the app's folder. If Overheard AI already holds
+the port, that opens your browser and stops there. If not, it opens your browser at once onto
+a page that waits while the app starts. When the code is newer than the last build, as after a
+`git pull`, it rebuilds first. It rebuilds only the code already in the folder, and never checks
+for or downloads updates. Account settings can turn it off. With no console to read, its output
+goes to `data/overheard.log`.
+
+On Windows the icon starts Node through `conhost.exe --headless`, so no window appears. On a
+Mac the app keeps the `PATH` of the terminal you ran `npm run shortcut` in, so it finds `node`
+and the other command line tools you use. A Mac may ask once for access when the app's folder
+is in Documents, Desktop or Downloads. Run `npm run shortcut` again after you move the folder or reinstall Node.
+To remove the icon, delete it. [ADR 0008](docs/decisions/0008-one-click-open.md) records why it
+works this way.
 
 ## Known limitations
 
@@ -207,6 +290,8 @@ picked. `npm run test:bun` runs the tests under Bun.
 - Gemini, Claude Opus 5.5 and Claude Sonnet 5.5 can't be forced to search, so they are told
   to. An answer with
   no search is retried, then counted as failed, and you still pay for the call.
+- In subscription mode, Claude Code tells the model the email you signed in with, which can
+  tilt answers in your own category. A separate account with a neutral email avoids it.
 - Stopping the app mid-run can repeat up to 15 calls, the ones in flight when it stopped.
 - Node 22 and 24 print `ExperimentalWarning: SQLite is an experimental feature` at boot. It is
   harmless. Node 25 and Bun don't print it.

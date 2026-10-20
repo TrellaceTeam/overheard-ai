@@ -2,8 +2,32 @@ import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AvailabilityView } from "@/lib/assistant-menu";
 import { providerLabel } from "@/lib/failure-reasons";
-import { keyEnvNamesSafe, PROVIDER_KEY_PAGES } from "@/lib/provider-keys";
+import {
+  isCliProvider,
+  keyEnvNamesSafe,
+  PROVIDER_CLI,
+  PROVIDER_KEY_PAGES,
+} from "@/lib/provider-keys";
 import type { KeyStatus, ProviderSlug } from "@/components/types";
+
+/**
+ * A subscription-mode row whose tool answered its status command signed out.
+ * It still routes calls, which would fail on the sign-in card, so the row says
+ * so before anyone spends a check or a run on it.
+ */
+function signedOut(status: KeyStatus): boolean {
+  return status.source === "cli" && status.signedIn === false;
+}
+
+/** What stands behind a configured row. */
+function sourceLabel(status: KeyStatus): string {
+  if (status.source === "mock") return "mock provider";
+  if (status.source === "cli" && isCliProvider(status.provider)) {
+    const cli = PROVIDER_CLI[status.provider];
+    return `via ${cli.command}, on your ${cli.plan} plan`;
+  }
+  return "key found";
+}
 
 /**
  * The provider key panel on the settings screens.
@@ -18,8 +42,10 @@ import type { KeyStatus, ProviderSlug } from "@/components/types";
  * on every read, so that costs nothing and needs no restart.
  *
  * With OVERHEARD_MOCK_PROVIDERS=1 the offline seam answers for every provider,
- * so `configured` is true with no key anywhere. `source` tells the row which of
- * the two it is.
+ * so `configured` is true with no key anywhere. In subscription mode a
+ * provider's command line tool answers on the user's plan, also with no key.
+ * `source` tells the row which it is, and `signedIn` whether that tool is
+ * signed in yet.
  */
 export function KeyStatusList({
   statuses,
@@ -56,13 +82,21 @@ export function KeyStatusList({
         <div key={status.provider} className="flex flex-wrap items-center gap-3 p-4">
           <span className="min-w-24 text-sm font-medium">{providerLabel(status.provider)}</span>
 
-          {status.configured ? (
+          {signedOut(status) && isCliProvider(status.provider) ? (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <X className="size-3.5" />
+              {PROVIDER_CLI[status.provider].tool} is installed but not signed in with your{" "}
+              {PROVIDER_CLI[status.provider].plan} plan. Run{" "}
+              <code className="num text-foreground">{PROVIDER_CLI[status.provider].signIn}</code> in
+              a terminal and sign in with that plan, then check again.
+            </span>
+          ) : status.configured ? (
             <span className="inline-flex items-center gap-1 text-xs text-primary">
               <Check className="size-3.5" />
               {/* "key found" on a machine with no keys at all, said three times
                   over, is the first thing a reader of the repo sees when they
                   boot the demo with OVERHEARD_MOCK_PROVIDERS=1. */}
-              {status.source === "mock" ? "mock provider" : "key found"}
+              {sourceLabel(status)}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -71,7 +105,10 @@ export function KeyStatusList({
               <code className="num text-foreground">
                 {keyEnvNamesSafe(status.provider) ?? "its API key"}
               </code>{" "}
-              to your .env file.
+              to your .env file
+              {isCliProvider(status.provider)
+                ? `, or install ${PROVIDER_CLI[status.provider].tool} and sign in with your plan.`
+                : "."}
             </span>
           )}
 
@@ -92,7 +129,7 @@ export function KeyStatusList({
                 )}
               </span>
             )}
-            {showChecks && status.configured && (
+            {showChecks && status.configured && !signedOut(status) && (
               <Button
                 type="button"
                 size="sm"
@@ -108,15 +145,18 @@ export function KeyStatusList({
             )}
           </div>
 
-          {status.configured && (
+          {status.configured && !signedOut(status) && (
             <ModelsOnKey report={availability?.[status.provider]} names={modelNames} />
           )}
         </div>
       ))}
-      {onRecheckKeys && statuses.some((status) => !status.configured) && (
+      {onRecheckKeys && statuses.some((status) => !status.configured || signedOut(status)) && (
         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-xs text-muted-foreground">
-            Added a key to .env? Check again to pick it up. There is no need to restart.
+            {statuses.some(signedOut)
+              ? "Signed in, or added a key to .env?"
+              : "Added a key to .env?"}{" "}
+            Check again to pick it up. There is no need to restart.
           </p>
           <Button type="button" size="sm" variant="outline" onClick={onRecheckKeys}>
             Check again
@@ -150,6 +190,19 @@ export function KeyStatusList({
             ))}
           </ul>
         </details>
+        <details>
+          <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+            Use a Claude or ChatGPT plan instead
+          </summary>
+          <ul className="my-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+            <li>
+              With no key, Overheard AI asks through {PROVIDER_CLI.anthropic.tool} or{" "}
+              {PROVIDER_CLI.openai.tool} when it is installed and signed in with your plan.
+            </li>
+            <li>A key, when one is set, wins over the plan.</li>
+            <li>The README's subscription mode section says what changes.</li>
+          </ul>
+        </details>
       </div>
     </div>
   );
@@ -179,12 +232,13 @@ function ModelsOnKey({
     });
   const available = named(report.available);
   const missing = named(report.missing);
+  const source = report.plan ? "your plan" : "this key";
   return (
     <p className="basis-full text-xs text-muted-foreground">
       {available.length > 0
-        ? `Models on this key: ${available.join(", ")}.`
-        : "This key lists none of the models Overheard AI offers."}
-      {missing.length > 0 && ` Not on this key: ${missing.join(", ")}.`}
+        ? `Models on ${source}: ${available.join(", ")}.`
+        : `${report.plan ? "Your plan" : "This key"} lists none of the models Overheard AI offers.`}
+      {missing.length > 0 && ` Not on ${source}: ${missing.join(", ")}.`}
     </p>
   );
 }

@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { RunPlan } from "@/components/types";
+import { usePlanProviders } from "@/components/usePlanProviders";
+import { callsByProvider, runSpend, type RunSpend } from "@/lib/plan-spend";
 import { estimateRunSpend, type PricedModelRow } from "@/lib/run-estimate";
 import { listExtractionModels, listModels, listProjectModels } from "@/server/api/models";
 import { getProjectSettings } from "@/server/api/projects";
@@ -23,9 +25,10 @@ export function countsTowardRun(prompt: EstimatePrompt): boolean {
 /**
  * The next run's price, computed the wizard's way (lib/run-estimate): list
  * prices, typical call sizes, the project's own extractor, and perception only
- * while the planner says the next run adds it. The Runner's inline line and
- * both Run now dialogs read their estimate from here, so the confirmation
- * where the spend is decided cannot disagree with the line that led to it.
+ * while the planner says the next run adds it, split by who pays
+ * (lib/plan-spend). The Runner's inline line and both Run now dialogs read
+ * their estimate from here, so the confirmation where the spend is decided
+ * cannot disagree with the line that led to it.
  */
 export function useRunEstimate({
   projectId,
@@ -37,7 +40,7 @@ export function useRunEstimate({
   prompts: readonly EstimatePrompt[] | undefined;
   /** The planner's next-run plan. Its perception count decides whether perception is priced. */
   plan: RunPlan | null | undefined;
-}): number | null {
+}): RunSpend | null {
   // Priced only once a plan exists: on screens that fetch the plan lazily for
   // the dialog, the catalogues stay unfetched until the dialog can show a plan.
   const hasPlan = plan != null;
@@ -61,10 +64,12 @@ export function useRunEstimate({
     queryFn: () => getProjectSettings({ data: { projectId } }),
     enabled: hasPlan,
   });
+  const { planProviders, ready: payersKnown } = usePlanProviders({ enabled: hasPlan });
 
   // Held back until every input has resolved: an estimate that silently omits
   // the extractor while the settings load would show a wrong number next to a
-  // correct call count.
+  // correct call count, and one read before the key status would call plan
+  // calls key calls.
   return useMemo(() => {
     if (
       !plan ||
@@ -72,7 +77,8 @@ export function useRunEstimate({
       !models.data ||
       !selected.data ||
       !extractionModels.data ||
-      !settings.data
+      !settings.data ||
+      !payersKnown
     ) {
       return null;
     }
@@ -83,14 +89,33 @@ export function useRunEstimate({
     const totalIterations = prompts
       .filter(countsTowardRun)
       .reduce((sum, prompt) => sum + prompt.iterations, 0);
-    return estimateRunSpend({
+    const assistants = selected.data
+      .map((row) => catalogue.find((model) => model.id === row.modelId))
+      .filter((model): model is PricedModelRow => model !== undefined);
+    const extractorId = settings.data.extractionModelId ?? null;
+    const includePerception = (plan.perceptionCalls ?? 0) > 0;
+    const usd = estimateRunSpend({
       totalIterations,
-      assistants: selected.data
-        .map((row) => catalogue.find((model) => model.id === row.modelId))
-        .filter((model): model is PricedModelRow => model !== undefined),
-      extractorId: settings.data.extractionModelId ?? null,
+      assistants,
+      extractorId,
       extractionCatalogue,
-      includePerception: (plan.perceptionCalls ?? 0) > 0,
+      includePerception,
     });
-  }, [plan, prompts, models.data, selected.data, extractionModels.data, settings.data]);
+    const calls = callsByProvider({
+      totalIterations,
+      assistants,
+      extractor: extractionCatalogue.find((row) => row.id === extractorId) ?? null,
+      includePerception,
+    });
+    return runSpend(usd, calls, planProviders);
+  }, [
+    plan,
+    prompts,
+    models.data,
+    selected.data,
+    extractionModels.data,
+    settings.data,
+    payersKnown,
+    planProviders,
+  ]);
 }

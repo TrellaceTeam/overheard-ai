@@ -24,6 +24,7 @@ import { ConnectionBanner } from "@/components/ConnectionBanner";
 import { ScheduledRunNotices } from "@/components/ScheduledRunNotices";
 import { TourProvider } from "@/components/TutorialTour";
 import { listProjects } from "@/server/api/projects";
+import { quitApp } from "@/server/api/settings";
 
 /**
  * Owns the document: the head, the stylesheet, the query client every screen
@@ -198,6 +199,7 @@ function AppShell({ children }: { children: ReactNode }) {
             projects={(projects ?? []).map((project) => ({ id: project.id, name: project.name }))}
             {...(activeProjectId === undefined ? {} : { activeProjectId })}
             loading={isPending}
+            onQuit={() => quitApp()}
           />
           <Link
             to="/"

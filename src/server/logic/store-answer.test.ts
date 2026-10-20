@@ -267,6 +267,22 @@ describe("failTask and releaseTaskForRetry", () => {
     expect(after.failure_code).toBeNull();
   });
 
+  it("keeps why the retried attempt failed after the task succeeds", () => {
+    claimTasks(db, 10, "worker-1");
+    releaseTaskForRetry(db, TASK, "TIMEOUT", "TIMEOUT stopped after 90000ms", backoffAt(1));
+
+    storeAnswer(db, TASK, {
+      answerText: "x",
+      answerTokens: 1,
+      latencyMs: 5,
+      providerCostUsd: 0,
+    });
+
+    const after = task();
+    expect(after.retry_failure_code).toBe("TIMEOUT");
+    expect(after.retry_error).toBe("TIMEOUT stopped after 90000ms");
+  });
+
   it("returns extracting to answered, never to queued", () => {
     db.prepare("UPDATE run_tasks SET status = 'answered', answer_text = 'x' WHERE id = ?").run(
       TASK,

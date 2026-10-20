@@ -16,18 +16,18 @@ const setProjectModelInput = z.object({
   on: z.boolean(),
 });
 
-/** The assistants a project can monitor. */
+/** The assistants a project can monitor, priced as this install pays for them. */
 export const listModels = createServerFn({ method: "GET" }).handler(async () => {
   const { getDb } = await import("../db/client");
-  const { listModels: op } = await import("./ops/models");
-  return op(getDb());
+  const { listModels: op, pricedForThisInstall } = await import("./ops/models");
+  return pricedForThisInstall(op(getDb()));
 });
 
-/** The models that can read an answer, cheapest first. */
+/** The models that can read an answer, cheapest first, priced as this install pays for them. */
 export const listExtractionModels = createServerFn({ method: "GET" }).handler(async () => {
   const { getDb } = await import("../db/client");
-  const { listExtractionModels: op } = await import("./ops/models");
-  return op(getDb());
+  const { listExtractionModels: op, pricedForThisInstall } = await import("./ops/models");
+  return pricedForThisInstall(op(getDb()));
 });
 
 export const listProjectModels = createServerFn({ method: "GET" })

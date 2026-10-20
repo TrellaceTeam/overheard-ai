@@ -41,3 +41,37 @@ export function keyEnvNames(provider: KeyProvider): string {
 export function keyEnvNamesSafe(slug: string): string | null {
   return slug in PROVIDER_KEY_ENV ? keyEnvNames(slug as KeyProvider) : null;
 }
+
+/**
+ * Subscription mode: a provider asked through its own command line tool,
+ * signed in with the user's plan, instead of its API with a key. Only the two
+ * tools this build speaks have an entry. `env` names the variable that turns
+ * the mode on and holds the command, `command` is the name the tool installs
+ * under, `tool` is what its maker calls it, `plan` is the plan it bills,
+ * `signIn` is the command that signs it in, and `update` is the usual way to
+ * update it.
+ */
+export const PROVIDER_CLI = {
+  anthropic: {
+    env: "OVERHEARD_ANTHROPIC_CLI",
+    command: "claude",
+    tool: "Claude Code",
+    plan: "Claude",
+    signIn: "claude auth login",
+    update: "claude update",
+  },
+  openai: {
+    env: "OVERHEARD_OPENAI_CLI",
+    command: "codex",
+    tool: "Codex",
+    plan: "ChatGPT",
+    signIn: "codex login",
+    update: "npm install -g @openai/codex@latest",
+  },
+} as const;
+
+export type CliProvider = keyof typeof PROVIDER_CLI;
+
+export function isCliProvider(slug: string): slug is CliProvider {
+  return Object.hasOwn(PROVIDER_CLI, slug);
+}

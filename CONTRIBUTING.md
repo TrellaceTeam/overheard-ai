@@ -36,7 +36,9 @@ npm run build        # vite build, import protection on
 
 `npm run format` rewrites the formatting and applies Biome's safe fixes. `server/index.mjs` is
 the one source file the typecheck skips, because it imports the build output; CI boots it after
-the build instead.
+the build instead, starts a second copy to check it stops before booting, and on each system
+runs `npm run shortcut` and opens the icon it made. The README's users start the app from that
+icon. `npm run dev` is for working on it.
 
 Bun is a supported second runtime, and CI checks it:
 
@@ -81,7 +83,10 @@ What it fabricates, and how that stays visible:
   cast is genuinely needed, write the reason above it.
 - **SQLite access goes through the driver adapter** in `src/server/db/driver.ts`. No native
   addon, no second SQLite package. See
-  [ADR 0001](docs/decisions/0001-runtime-and-sqlite-driver.md).
+  [ADR 0001](docs/decisions/0001-runtime-and-sqlite-driver.md). The one exception is
+  `server/index.mjs`, which reads the rebuild switch with the runtime's own `node:sqlite` or
+  `bun:sqlite` before it loads the build that holds the adapter. See
+  [ADR 0008](docs/decisions/0008-one-click-open.md).
 - **Schema changes are new numbered migrations** under `src/server/db/migrations/`. Never
   edit a migration that has shipped. Somebody's database has already applied it.
 
@@ -92,7 +97,8 @@ What it fabricates, and how that stays visible:
 - Server logic tests open an in-memory database (`openDatabase(":memory:")`), migrate it,
   and assert on rows. They do not mock the database.
 - Provider calls are never made in a test. The offline seam in
-  `src/server/worker/mock-provider.ts` is the seam to use.
+  `src/server/worker/mock-provider.ts` is the seam to use. Subscription mode's tests start a
+  stand-in script in place of `claude` or `codex`, never the real tool.
 - A test that asserts on wording asserts on the wording a user sees, not on a class name.
 - Prefer one test that fails for one reason over a test that asserts on a whole object.
 

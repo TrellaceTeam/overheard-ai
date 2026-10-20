@@ -122,6 +122,7 @@ export function RunFailures({
   onRetry,
   retrying = false,
   locked = null,
+  payer = "on your own keys",
 }: {
   tasks: FailedTask[];
   /** Queues the failed calls again. The route owns the server call and the toast. */
@@ -129,6 +130,8 @@ export function RunFailures({
   retrying?: boolean | undefined;
   /** When set, retrying is unavailable and this says why (the demo project). */
   locked?: string | null | undefined;
+  /** Who pays for the calls a retry makes (lib/plan-spend). */
+  payer?: string | undefined;
 }) {
   if (tasks.length === 0) return null;
   const groups = groupFailures(tasks.map(toStoredFailure));
@@ -159,8 +162,8 @@ export function RunFailures({
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Only the answers that failed are collected again, on your own keys. Answers already in are
-        kept, and one that failed while being scored is only scored again rather than asked again.
+        Only the answers that failed are collected again, {payer}. Answers already in are kept, and
+        one that failed while being scored is only scored again rather than asked again.
       </p>
       {groups.map((group) => (
         <GroupCard key={group.key} group={group} tasks={tasks} />

@@ -12,6 +12,7 @@ import type { ProviderSlug } from "@/components/types";
 import { useModelAvailability } from "@/components/useModelAvailability";
 import { useProviderChecks } from "@/components/useProviderChecks";
 import { MockProvidersNotice } from "@/components/MockProvidersNotice";
+import { OpeningSection } from "@/components/OpeningSection";
 import { CALL_LIMIT_MAX, CALL_LIMIT_MIN } from "@/lib/call-limits";
 import { errorText } from "@/lib/error-text";
 import { providerLabel } from "@/lib/failure-reasons";
@@ -23,15 +24,17 @@ import {
   inflightCaps as fetchInflightCaps,
   keyStatus as fetchKeyStatus,
   databaseInfo,
+  rebuildOnOpen as fetchRebuildOnOpen,
   setCallLimit as saveCallLimit,
   setInflightCap as saveInflightCap,
+  setRebuildOnOpen as saveRebuildOnOpen,
   workerStatus,
 } from "@/server/api/settings";
 
 /**
  * Owns the application settings screen: what a local-first tool owes its user
- * about itself, plus the run size limit, each provider's calls in flight and
- * the demo project.
+ * about itself, plus the run size limit, each provider's calls in flight, how
+ * the icon opens the app, and the demo project.
  *
  * Which provider keys the environment holds, and whether they work. Where the
  * database file is and how big it has grown, so it can be copied. And whether
@@ -48,7 +51,7 @@ export const Route = createFileRoute("/settings")({
       {
         name: "description",
         content:
-          "Provider keys, the run size limit, calls in flight, your database and its backups, the worker, and the demo project.",
+          "Provider keys, the run size limit, calls in flight, your database and its backups, the worker, how the app opens, and the demo project.",
       },
     ],
   }),
@@ -72,6 +75,8 @@ function Settings() {
   const demo = useQuery({ queryKey: ["demo-state"], queryFn: () => fetchDemoState() });
   const limits = useQuery({ queryKey: ["call-limit"], queryFn: () => fetchCallLimit() });
   const inflight = useQuery({ queryKey: ["inflight-caps"], queryFn: () => fetchInflightCaps() });
+  const rebuild = useQuery({ queryKey: ["rebuild-on-open"], queryFn: () => fetchRebuildOnOpen() });
+  const [savingRebuild, setSavingRebuild] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [limitDraft, setLimitDraft] = useState<string | null>(null);
   const [limitError, setLimitError] = useState<string | null>(null);
@@ -144,6 +149,19 @@ function Settings() {
     } catch (error) {
       toast.error(errorText(error, `Could not save ${label} calls in flight`));
       return false;
+    }
+  }
+
+  async function commitRebuildOnOpen(on: boolean) {
+    setSavingRebuild(true);
+    try {
+      await saveRebuildOnOpen({ data: { on } });
+      queryClient.setQueryData(["rebuild-on-open"], { on });
+      toast.success(on ? "The icon rebuilds after code changes" : "The icon no longer rebuilds");
+    } catch (error) {
+      toast.error(errorText(error, "Could not save the rebuild setting"));
+    } finally {
+      setSavingRebuild(false);
     }
   }
 
@@ -326,6 +344,13 @@ function Settings() {
           </p>
         </div>
       </section>
+
+      <OpeningSection
+        on={rebuild.data?.on ?? null}
+        readFailed={rebuild.isError}
+        saving={savingRebuild}
+        onChange={(on) => void commitRebuildOnOpen(on)}
+      />
 
       <section className="space-y-3">
         <h2 className="type-section">Run size limit</h2>

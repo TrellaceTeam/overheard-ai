@@ -1,0 +1,631 @@
+/**
+ * Subscription mode's adapter. A call goes to the provider's own command line
+ * tool, signed in with the user's plan, instead of to the provider's API:
+ * Claude Code (`claude -p`) for Anthropic and Codex (`codex exec`) for OpenAI.
+ *
+ * Every call is a fresh process in a fresh temporary folder that holds only
+ * its own instructions (and, on a Codex extraction, its shape), so no call
+ * sees another's answer, a saved session or the files around the app. The
+ * question goes in on stdin and the instructions in a file, and no shell
+ * starts the process (see cli-command.ts), so no prompt text is ever parsed as
+ * an argument.
+ *
+ * Both tools are coding agents and bring context of their own. The arguments
+ * below remove what each lets a caller remove: the user's settings,
+ * instructions, memory, skills, plugins and every tool but web search.
+ * docs/decisions/0007-subscription-mode.md lists what remains.
+ *
+ * This module returns what happened as data. providers.ts turns a failure
+ * into the ProviderError the worker records.
+ */
+import { type ChildProcess, spawn } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { type CliProvider, PROVIDER_CLI, PROVIDER_KEY_ENV } from "@/lib/provider-keys";
+import { type Launch, type LaunchLookup, launchProblem, lookupLaunch } from "./cli-command";
+import type { EnforcedShape } from "./extraction";
+import type { CliTarget } from "./keys";
+import type { ProviderResult } from "./providers";
+
+export interface CliCall {
+  target: CliTarget;
+  modelId: string;
+  system: string;
+  user: string;
+  /** A JSON reply. Turns thinking off on Claude, where it otherwise takes over a minute. */
+  jsonMode: boolean;
+  jsonSchema?: EnforcedShape | undefined;
+  webSearch: boolean;
+  timeoutMs: number;
+}
+
+/**
+ * Why a call failed, sorted by what the user can do about it. `refused` is the
+ * provider's own HTTP refusal, passed through by the tool. `setting_refused`
+ * is the tool itself refusing an argument this module passes, because its
+ * version and this build disagree.
+ */
+export type CliFailure =
+  | { kind: "sign_in"; message: string }
+  | { kind: "plan_limit"; message: string }
+  | { kind: "setting_refused"; message: string }
+  | { kind: "timeout"; message: string }
+  | { kind: "refused"; status: number; message: string }
+  | { kind: "failed"; message: string };
+
+export type CliOutcome = { ok: true; result: ProviderResult } | { ok: false; failure: CliFailure };
+
+/** What a tool's output says, before the exit is judged. */
+export type CliReading =
+  | { ok: true; result: ProviderResult }
+  | { ok: false; message: string; status: number | null };
+
+/**
+ * Removed from the tool's environment. Claude Code uses ANTHROPIC_API_KEY
+ * ahead of the plan sign-in and bills it at API rates, and Codex does the
+ * same with CODEX_API_KEY. The other providers' keys are no business of
+ * either tool.
+ */
+const KEY_VARIABLES = [
+  ...Object.values(PROVIDER_KEY_ENV).flat(),
+  "ANTHROPIC_AUTH_TOKEN",
+  "CODEX_API_KEY",
+];
+
+/**
+ * Codex features that add tools or instructions a question does not need.
+ * Written as `features.<name>=false` and not `--disable <name>`, because
+ * `--disable` rejects a name the installed version does not know, and the
+ * list differs between versions.
+ */
+const CODEX_FEATURES_OFF = [
+  "multi_agent",
+  "apps",
+  "plugins",
+  "remote_plugin",
+  "shell_tool",
+  "unified_exec",
+  "browser_use",
+  "browser_use_external",
+  "computer_use",
+  "image_generation",
+  "tool_suggest",
+  "goals",
+  "skill_search",
+  "in_app_browser",
+  "workspace_dependencies",
+  "memories",
+  "hooks",
+  "realtime_conversation",
+];
+
+interface CallFiles {
+  instructions: string;
+  /** Codex reads the enforced shape from a file. Claude Code takes it inline. */
+  schema: string | null;
+}
+
+/**
+ * `--safe-mode` drops CLAUDE.md, skills, plugins, hooks and MCP servers and
+ * keeps the plan sign-in. `--system-prompt-file` replaces Claude Code's own
+ * system prompt. Low effort matches the API path's answers.
+ */
+export function claudeArgs(call: CliCall, files: CallFiles): string[] {
+  return [
+    "-p",
+    "--safe-mode",
+    "--no-session-persistence",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--model",
+    call.modelId,
+    "--system-prompt-file",
+    files.instructions,
+    ...(call.webSearch
+      ? ["--tools", "WebSearch", "--allowedTools", "WebSearch", "--effort", "low"]
+      : ["--tools", ""]),
+    ...(call.jsonSchema ? ["--json-schema", JSON.stringify(call.jsonSchema.schema)] : []),
+  ];
+}
+
+/**
+ * `model_instructions_file` replaces Codex's own instructions. The project
+ * instructions limit, the skills budget and the features list remove the rest
+ * Codex lets a caller remove. Codex searches a cached index unless search is
+ * set to live. A path goes in as a JSON string, which TOML reads the same way.
+ */
+export function codexArgs(call: CliCall, files: CallFiles): string[] {
+  return [
+    "exec",
+    "-",
+    "--json",
+    "--ephemeral",
+    "--skip-git-repo-check",
+    "--ignore-user-config",
+    "--sandbox",
+    "read-only",
+    "-m",
+    call.modelId,
+    "-c",
+    `model_instructions_file=${JSON.stringify(files.instructions)}`,
+    "-c",
+    "project_doc_max_bytes=1",
+    "-c",
+    // The smallest budget Codex accepts. It leaves the skills list empty.
+    "skills.max_context_tokens=1",
+    "-c",
+    "agents.enabled=false",
+    ...CODEX_FEATURES_OFF.flatMap((feature) => ["-c", `features.${feature}=false`]),
+    "-c",
+    call.webSearch ? 'web_search="live"' : 'web_search="disabled"',
+    ...(call.webSearch ? ["-c", 'model_reasoning_effort="low"'] : []),
+    ...(files.schema ? ["--output-schema", files.schema] : []),
+  ];
+}
+
+function cliEnv(provider: CliProvider, jsonMode: boolean): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const name of KEY_VARIABLES) delete env[name];
+  if (provider === "anthropic") {
+    // Many processes at once must not each try to update the binary they run from.
+    env["DISABLE_AUTOUPDATER"] = "1";
+    if (jsonMode) env["MAX_THINKING_TOKENS"] = "0";
+  }
+  return env;
+}
+
+function jsonLines<T>(stdout: string): T[] {
+  const events: T[] = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    if (!line.trim().startsWith("{")) continue;
+    try {
+      // The event types name every field optional, and the readers check each
+      // one before use, so an event of another shape reads as missing fields.
+      events.push(JSON.parse(line) as T);
+    } catch {
+      // A partial last line from a killed process.
+    }
+  }
+  return events;
+}
+
+function totalOf(input: number | null, output: number | null): number | null {
+  return input === null && output === null ? null : (input ?? 0) + (output ?? 0);
+}
+
+type ClaudeBlock = {
+  type?: string;
+  id?: string;
+  name?: string;
+  tool_use_id?: string;
+  is_error?: boolean;
+};
+
+type ClaudeEvent = {
+  type?: string;
+  message?: { model?: string; content?: ClaudeBlock[] };
+  result?: string;
+  is_error?: boolean;
+  stop_reason?: string | null;
+  structured_output?: unknown;
+  api_error_status?: number | null;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+};
+
+/**
+ * Reads `claude -p --output-format stream-json`. The last event is the
+ * result. A search counts when its WebSearch call came back without an error.
+ * Input tokens include cached ones, which Claude Code reports apart.
+ */
+export function readClaude(stdout: string): CliReading {
+  const events = jsonLines<ClaudeEvent>(stdout);
+  const result = events.filter((event) => event.type === "result").at(-1);
+  if (!result) return { ok: false, message: "", status: null };
+  if (result.is_error) {
+    return { ok: false, message: result.result ?? "", status: result.api_error_status ?? null };
+  }
+  const blocks = (type: string) =>
+    events.filter((event) => event.type === type).flatMap((event) => event.message?.content ?? []);
+  const searches = new Set(
+    blocks("assistant")
+      .filter((block) => block.type === "tool_use" && block.name === "WebSearch")
+      .map((block) => block.id),
+  );
+  const searchCalls = blocks("user").filter(
+    (block) =>
+      block.type === "tool_result" && searches.has(block.tool_use_id) && block.is_error !== true,
+  ).length;
+  const usage = result.usage;
+  const inputTokens = usage
+    ? (usage.input_tokens ?? 0) +
+      (usage.cache_creation_input_tokens ?? 0) +
+      (usage.cache_read_input_tokens ?? 0)
+    : null;
+  const outputTokens = usage?.output_tokens ?? null;
+  const shaped = result.structured_output;
+  return {
+    ok: true,
+    result: {
+      text:
+        shaped !== undefined && shaped !== null ? JSON.stringify(shaped) : (result.result ?? ""),
+      inputTokens,
+      outputTokens,
+      tokens: totalOf(inputTokens, outputTokens),
+      searchCalls,
+      stopReason: result.stop_reason ?? undefined,
+      truncated: result.stop_reason === "max_tokens",
+      model: events.find((event) => event.type === "assistant" && event.message?.model)?.message
+        ?.model,
+    },
+  };
+}
+
+type CodexEvent = {
+  type?: string;
+  item?: { type?: string; text?: string };
+  usage?: { input_tokens?: number; output_tokens?: number };
+  error?: { message?: string };
+  message?: string;
+};
+
+/** The HTTP status a tool quotes from the provider, as `status 401` or `"status":400`. */
+function quotedStatus(message: string): number | null {
+  const match = /\bstatus"?\s*:?\s*([45]\d\d)\b/.exec(message);
+  return match?.[1] ? Number(match[1]) : null;
+}
+
+/**
+ * Reads `codex exec --json`. A turn ends in turn.completed or turn.failed.
+ * `error` events before that are retries Codex recovers from, and an `error`
+ * item is a notice, such as the skills budget at work. The answer is the last
+ * agent message, after any the model wrote between searches.
+ */
+export function readCodex(stdout: string): CliReading {
+  const events = jsonLines<CodexEvent>(stdout);
+  const failed = events.find((event) => event.type === "turn.failed");
+  const completed = events.find((event) => event.type === "turn.completed");
+  if (failed || !completed) {
+    const message =
+      failed?.error?.message ??
+      events.filter((event) => event.type === "error").at(-1)?.message ??
+      "";
+    return { ok: false, message, status: quotedStatus(message) };
+  }
+  const items = events
+    .filter((event) => event.type === "item.completed")
+    .map((event) => event.item ?? {});
+  const inputTokens = completed.usage?.input_tokens ?? null;
+  const outputTokens = completed.usage?.output_tokens ?? null;
+  return {
+    ok: true,
+    result: {
+      text: items.filter((item) => item.type === "agent_message").at(-1)?.text ?? "",
+      inputTokens,
+      outputTokens,
+      tokens: totalOf(inputTokens, outputTokens),
+      searchCalls: items.filter((item) => item.type === "web_search").length,
+    },
+  };
+}
+
+/**
+ * A tool's argument parser refusing what it was given. Claude Code parses its
+ * arguments with Commander ("error: unknown option '--x'") and Codex with clap
+ * ("error: unexpected argument '--x' found"), and both start the line with
+ * "error: ", which a provider's own refusal does not.
+ */
+const SETTING_REFUSED =
+  /^error: (?:unknown option|unexpected argument|unrecognized (?:option|argument)|invalid value|option '[^']*' argument '[^']*' is invalid)/im;
+
+/**
+ * Sorts a failed call by the tools' own wording. Neither tool documents its
+ * messages, so these are the phrasings seen from Claude Code 2.1 and Codex
+ * 0.160 ("Not logged in · Please run /login", "401 Unauthorized", "You've hit
+ * your usage limit"). Anything else keeps the tool's message for the detail.
+ */
+export function classifyCliFailure(message: string, status: number | null): CliFailure {
+  // First, so a refused option whose name holds "limit" or "login" is not
+  // read as a plan or sign-in problem.
+  if (status === null && SETTING_REFUSED.test(message)) {
+    return { kind: "setting_refused", message };
+  }
+  if (
+    status === 401 ||
+    /not logged in|\/login|(?:log|sign) ?in again|authentication_failed|unauthori[sz]ed/i.test(
+      message,
+    )
+  ) {
+    return { kind: "sign_in", message };
+  }
+  if (
+    status === 429 ||
+    /usage limit|hit your limit|limit reached|rate.?limit|too many requests/i.test(message)
+  ) {
+    return { kind: "plan_limit", message };
+  }
+  if (status !== null) return { kind: "refused", status, message };
+  return { kind: "failed", message };
+}
+
+interface Exit {
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  /** Set when the program could not be started at all. */
+  startError: string | null;
+}
+
+/** Stops the tool and everything it started. */
+function stopTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (pid === undefined) return;
+  if (process.platform === "win32") {
+    // Killing the pid alone would leave the native tool running when it was
+    // started through its npm launcher's JS runtime.
+    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      windowsHide: true,
+      stdio: "ignore",
+    }).on("error", () => child.kill());
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    child.kill("SIGKILL");
+  }
+}
+
+/** Runs one process to its end or its deadline. Exported for the timeout test. */
+export function runProcess(
+  launch: Launch,
+  args: readonly string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv; stdin: string; timeoutMs: number },
+): Promise<Exit> {
+  return new Promise((resolve) => {
+    const exit: Exit = { stdout: "", stderr: "", timedOut: false, startError: null };
+    const child = spawn(launch.file, [...launch.prefix, ...args], {
+      cwd: options.cwd,
+      env: options.env,
+      windowsHide: true,
+      // Its own process group off Windows, so stopTree reaches its children.
+      detached: process.platform !== "win32",
+    });
+    const timer = setTimeout(() => {
+      exit.timedOut = true;
+      stopTree(child);
+    }, options.timeoutMs);
+    const finish = () => {
+      clearTimeout(timer);
+      resolve(exit);
+    };
+    child.stdout?.setEncoding("utf8").on("data", (chunk: string) => {
+      exit.stdout += chunk;
+    });
+    child.stderr?.setEncoding("utf8").on("data", (chunk: string) => {
+      exit.stderr += chunk;
+    });
+    child.on("error", (error) => {
+      exit.startError = error.message;
+      finish();
+    });
+    child.on("close", finish);
+    // A tool that exits before reading its input closes the pipe under the write.
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(options.stdin);
+  });
+}
+
+/** Long enough for a status command, short enough not to hold the key panel. */
+const STATUS_TIMEOUT_MS = 10_000;
+
+const STATUS_ARGS: Record<CliProvider, string[]> = {
+  anthropic: ["auth", "status"],
+  openai: ["login", "status"],
+};
+
+/** A signed-in tool stays signed in, so that answer is reused for this long. */
+const SIGNED_IN_FRESH_MS = 60_000;
+/**
+ * Any answer, and a read still running, is shared for this long, so a burst
+ * of key status reads, a page's or another site's, starts one process.
+ */
+const ANY_FRESH_MS = 2_000;
+
+interface SignInRead {
+  at: number;
+  value: Promise<boolean | null>;
+  result?: boolean | null;
+}
+
+// On globalThis, like the model list cache, so a dev hot reload keeps it.
+const SIGN_IN_KEY = Symbol.for("overheard.cliSignIn");
+type SignInGlobal = typeof globalThis & { [SIGN_IN_KEY]?: Map<string, SignInRead> };
+
+function signInReads(): Map<string, SignInRead> {
+  const holder = globalThis as SignInGlobal;
+  holder[SIGN_IN_KEY] ??= new Map();
+  return holder[SIGN_IN_KEY];
+}
+
+/** Forget every status read. For tests. */
+export function clearSignInCache(): void {
+  signInReads().clear();
+}
+
+/**
+ * Whether the tool is signed in to a plan, from its own status command, which
+ * makes no model call. It runs with a call's environment, so CLAUDE_CONFIG_DIR
+ * and CODEX_HOME pick the same account a call uses. A read still running is
+ * shared, a signed-out answer is read again after two seconds, so signing in
+ * shows on the next check, and a signed-in one after a minute. Never rejects.
+ */
+export function cliSignedIn(target: CliTarget): Promise<boolean | null> {
+  const home = process.env[target.provider === "anthropic" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME"];
+  const key = [target.provider, target.command, home ?? ""].join("\0");
+  const now = Date.now();
+  const held = signInReads().get(key);
+  if (held) {
+    const age = now - held.at;
+    const running = !("result" in held);
+    if (running || age < ANY_FRESH_MS || (held.result === true && age < SIGNED_IN_FRESH_MS)) {
+      return held.value;
+    }
+  }
+  const read: SignInRead = { at: now, value: readSignIn(target).catch(() => null) };
+  void read.value.then((result) => {
+    read.result = result;
+  });
+  signInReads().set(key, read);
+  return read.value;
+}
+
+/**
+ * `claude auth status` prints JSON with `loggedIn`, and `codex login status`
+ * prints "Logged in using ChatGPT" or "Not logged in" on stderr. Both exit 1
+ * signed out. Codex signed in another way ("Logged in using an API key",
+ * "API key configured") bills that and not a plan, so it reads as not signed
+ * in to one. Null when the answer cannot be read, so a version whose status
+ * command changed is never shown as signed out. Only the yes or no leaves
+ * here: Claude Code's status also prints the account's email.
+ */
+async function readSignIn(target: CliTarget): Promise<boolean | null> {
+  const lookup = lookupLaunch(target.command);
+  if (!lookup.found) return null;
+  const exit = await runProcess(lookup.launch, STATUS_ARGS[target.provider], {
+    cwd: tmpdir(),
+    env: cliEnv(target.provider, false),
+    stdin: "",
+    timeoutMs: STATUS_TIMEOUT_MS,
+  });
+  if (exit.timedOut || exit.startError !== null) return null;
+  const text = `${exit.stdout}\n${exit.stderr}`;
+  if (target.provider === "anthropic") {
+    try {
+      // Optional and unknown, so the typeof below is the only thing trusted.
+      const status = JSON.parse(exit.stdout) as { loggedIn?: unknown };
+      if (typeof status.loggedIn === "boolean") return status.loggedIn;
+    } catch {
+      // Not the JSON this version prints, so fall through to its wording.
+    }
+  }
+  if (/not logged in/i.test(text)) return false;
+  if (target.provider !== "openai") return null;
+  if (/logged in using chatgpt/i.test(text)) return true;
+  return /logged in using|api key configured/i.test(text) ? false : null;
+}
+
+/** Long enough for Codex to read its catalogue, short enough not to hold the key panel. */
+const LIST_TIMEOUT_MS = 15_000;
+
+/**
+ * The model ids the signed-in tool offers, or null when it has no list to
+ * read. Codex prints its catalogue for the account with `codex debug models`,
+ * which makes no model call. Claude Code has no such command. A debug command
+ * can change shape between versions, so anything unexpected reads as no list,
+ * never as a failure.
+ */
+export async function listCliModels(target: CliTarget): Promise<string[] | null> {
+  if (target.provider !== "openai") return null;
+  const lookup = lookupLaunch(target.command);
+  if (!lookup.found) return null;
+  const exit = await runProcess(lookup.launch, ["debug", "models"], {
+    cwd: tmpdir(),
+    env: cliEnv(target.provider, false),
+    stdin: "",
+    timeoutMs: LIST_TIMEOUT_MS,
+  });
+  if (exit.timedOut || exit.startError !== null) return null;
+  try {
+    // Every field optional and each slug checked below, so another shape reads
+    // as no list. A `models` that is not an array throws, which also does.
+    const parsed = JSON.parse(exit.stdout) as { models?: Array<{ slug?: unknown }> };
+    const ids = (parsed.models ?? []).flatMap((model) =>
+      typeof model.slug === "string" ? [model.slug] : [],
+    );
+    return ids.length > 0 ? ids : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Five lines of what a failed tool printed on stderr, for the detail. A tool
+ * puts its error last, after any warnings, except that an argument parser puts
+ * it first and follows it with usage text.
+ */
+function stderrMessage(stderr: string): string {
+  const refused = SETTING_REFUSED.exec(stderr);
+  const lines = (refused ? stderr.slice(refused.index) : stderr).trim().split(/\r?\n/);
+  return (refused ? lines.slice(0, 5) : lines.slice(-5)).join("\n");
+}
+
+/**
+ * One call through the provider's command. Never throws for a failed call.
+ * `launch` is injected by the tests, which start a stand-in tool.
+ */
+export async function callCli(call: CliCall, launch?: Launch): Promise<CliOutcome> {
+  const { provider, command } = call.target;
+  const lookup: LaunchLookup = launch ? { found: true, launch } : lookupLaunch(command);
+  if (!lookup.found) {
+    return {
+      ok: false,
+      failure: { kind: "sign_in", message: launchProblem(provider, command, lookup) },
+    };
+  }
+
+  const dir = mkdtempSync(join(tmpdir(), "overheard-cli-"));
+  try {
+    const files: CallFiles = { instructions: join(dir, "instructions.md"), schema: null };
+    writeFileSync(files.instructions, call.system);
+    if (call.jsonSchema && provider === "openai") {
+      files.schema = join(dir, "schema.json");
+      writeFileSync(files.schema, JSON.stringify(call.jsonSchema.schema));
+    }
+    const args = provider === "anthropic" ? claudeArgs(call, files) : codexArgs(call, files);
+    const started = Date.now();
+    const exit = await runProcess(lookup.launch, args, {
+      cwd: dir,
+      env: cliEnv(provider, call.jsonMode),
+      stdin: call.user,
+      timeoutMs: call.timeoutMs,
+    });
+
+    if (exit.startError !== null) {
+      return {
+        ok: false,
+        failure: {
+          kind: "sign_in",
+          message: `${PROVIDER_CLI[provider].command} could not be started: ${exit.startError}`,
+        },
+      };
+    }
+    if (exit.timedOut) {
+      return {
+        ok: false,
+        failure: {
+          kind: "timeout",
+          message: `stopped after ${Date.now() - started}ms of a ${call.timeoutMs}ms budget`,
+        },
+      };
+    }
+    const reading = provider === "anthropic" ? readClaude(exit.stdout) : readCodex(exit.stdout);
+    if (reading.ok) return reading;
+    const message =
+      reading.message.trim() || stderrMessage(exit.stderr) || "the command printed nothing";
+    return { ok: false, failure: classifyCliFailure(message, reading.status) };
+  } finally {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // A stopped process can hold the folder on Windows for a moment. The
+      // system's temporary folder is cleaned on its own schedule.
+    }
+  }
+}

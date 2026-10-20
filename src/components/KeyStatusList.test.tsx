@@ -101,6 +101,89 @@ describe("KeyStatusList", () => {
     expect(screen.queryByText("key found")).toBeNull();
   });
 
+  it("offers the plan route beside the key only where a command line tool exists", () => {
+    render(
+      <KeyStatusList
+        statuses={[
+          { provider: "openai", configured: false, source: "none", result: { state: "untested" } },
+          { provider: "google", configured: false, source: "none", result: { state: "untested" } },
+        ]}
+        onCheck={() => {}}
+      />,
+    );
+    expect(screen.getByText(/or install Codex and sign in with your plan\./)).toBeDefined();
+    expect(screen.getAllByText(/or install/)).toHaveLength(1);
+  });
+
+  it("names a plan's models as the plan's, not a key's", () => {
+    render(
+      <KeyStatusList
+        statuses={[
+          { provider: "openai", configured: true, source: "cli", result: { state: "untested" } },
+        ]}
+        onCheck={() => {}}
+        availability={{
+          openai: { status: "ok", available: ["alpha"], missing: ["beta"], plan: true },
+        }}
+        modelNames={
+          new Map([
+            ["alpha", "Assistant Alpha"],
+            ["beta", "Assistant Beta"],
+          ])
+        }
+      />,
+    );
+    expect(
+      screen.getByText("Models on your plan: Assistant Alpha. Not on your plan: Assistant Beta."),
+    ).toBeDefined();
+  });
+
+  it("names the command and the plan when a provider is in subscription mode", () => {
+    render(
+      <KeyStatusList
+        statuses={[
+          { provider: "anthropic", configured: true, source: "cli", result: { state: "untested" } },
+        ]}
+        onCheck={() => {}}
+      />,
+    );
+    expect(screen.getByText("via claude, on your Claude plan")).toBeDefined();
+    expect(screen.queryByText("key found")).toBeNull();
+  });
+
+  it("says a plan's tool is installed but not signed in, and offers no paid check", () => {
+    const onRecheckKeys = vi.fn();
+    render(
+      <KeyStatusList
+        statuses={[
+          {
+            provider: "anthropic",
+            configured: true,
+            source: "cli",
+            signedIn: false,
+            result: { state: "untested" },
+          },
+        ]}
+        onCheck={() => {}}
+        onRecheckKeys={onRecheckKeys}
+        availability={{
+          anthropic: { status: "ok", available: ["alpha"], missing: [], plan: true },
+        }}
+        modelNames={new Map([["alpha", "Assistant Alpha"]])}
+      />,
+    );
+    expect(
+      screen.getByText(/Claude Code is installed but not signed in with your Claude plan\. Run/),
+    ).toBeDefined();
+    expect(screen.getByText("claude auth login")).toBeDefined();
+    expect(screen.queryByText("via claude, on your Claude plan")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check" })).toBeNull();
+    expect(screen.queryByText(/Models on your plan/)).toBeNull();
+    expect(screen.getByText(/Signed in, or added a key to \.env\?/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(onRecheckKeys).toHaveBeenCalledOnce();
+  });
+
   it("names the current models a key can use and the ones it cannot", () => {
     render(
       <KeyStatusList

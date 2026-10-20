@@ -43,6 +43,23 @@ The server binds `127.0.0.1` and does not read `HOST`. The `Host` test stops a b
 client on the network that can send any header it likes, so a wider bind would expose
 everything.
 
+## Starting, and the icon
+
+`server/index.mjs` takes the port before it imports the built app, because importing it boots,
+and boot recovery returns every in-flight task to the queue. The port is the lock: a second
+copy on the same port leaves before it opens the database. `vite dev` sets `strictPort` for the
+same reason. Every response carries `x-overheard-ai`, from `guarded` and from the entry's own
+waiting pages, so a second start can tell a running Overheard AI from another program.
+
+The icon `npm run shortcut` adds runs the entry with `--open`. Then a held port means: open
+the browser and leave. A free one means: open the browser at once, answer every request with a
+waiting page until the app is loaded, rebuild first when a file `vite build` reads is newer
+than `dist/server/server.js` and `app_state.rebuild_on_open` allows it, and copy all output to
+`data/overheard.log`. The entry reads that column straight from the file, before boot, because
+the app that would normally read it is the build in question. The menu's Quit ends the process
+through `quit` in `src/server/api/ops/settings.ts`. [ADR 0008](decisions/0008-one-click-open.md)
+has the reasons.
+
 ## The database
 
 One SQLite file in WAL mode, opened through the adapter below, migrated at boot. Sixteen
@@ -52,12 +69,12 @@ tables:
 | --- | --- |
 | `models` | The assistant catalogue: provider, model id, tier, prices, whether it can search, which models can be used as extractors, and which a newer model has `superseded`. A superseded model stays callable for the projects that ask it and is never preselected. Seeded and refreshed on every boot, except `is_active`, which belongs to the user. |
 | `projects` | One brand being tracked, with the optional brand description from setup, which nothing reads back. Several projects share a file, plus at most one built-in demo project (ADR 0006), flagged and generated, never run. |
-| `app_state` | One row of install-wide facts: the tutorial state, the run size limit (`max_planned_calls`) and each provider's calls in flight (`max_inflight_<provider>`, null for the default). |
+| `app_state` | One row of install-wide facts: the tutorial state, the run size limit (`max_planned_calls`), each provider's calls in flight (`max_inflight_<provider>`, null for the default) and whether the icon rebuilds a stale build before it starts the app (`rebuild_on_open`). |
 | `brands` | The target brand and its competitors, with name variants and domains. |
 | `prompts` | The buyer questions, with a `category` that is the tag (the server requires one whenever it creates or retags a question; the column itself is nullable), an `iterations` count, an on/off flag and an archived flag. A run asks a prompt only when it is on and not archived. |
 | `project_models` | Which assistants a project asks. |
 | `runs` | One measurement. Status, planned, completed and failed call counts, a config snapshot, whether it was a mock run, and when it was scored. |
-| `run_tasks` | One row per answer, and the answer text itself. `model_id` is the catalogue model asked, and `answer_model` is the version the provider said answered, which can be a dated snapshot behind that id. |
+| `run_tasks` | One row per answer, and the answer text itself. `model_id` is the catalogue model asked, and `answer_model` is the version the provider said answered, which can be a dated snapshot behind that id. `failure_code` and `error` hold the task's current failure, and `retry_failure_code` and `retry_error` the last attempt that was retried, kept after a success clears the other two. |
 | `extractions` | The structured read of one answer, with the raw JSON kept. |
 | `brand_observations` | One row per brand named in one answer: position, mention type, citation and evidence. |
 | `run_metrics` | The scored output of a run, at two scope levels. |
@@ -182,6 +199,12 @@ fails fails the task: with `EXTRACTION_TRUNCATED` when every reader ran out of t
 "The model that reads answers ran out of room", and with `EXTRACTION_UNREADABLE` otherwise,
 shown as "We could not read this answer". Retry on either walks the ladder again.
 
+In subscription mode, both calls for that provider go through its own command line tool
+instead of its API: one fresh `claude -p` or `codex exec` process per call, in an empty
+temporary folder, signed in with the user's plan. The switch is inside `callProvider`, so the
+two phases, the ladder and the retries do not change.
+[ADR 0007](decisions/0007-subscription-mode.md) has the details.
+
 Perception tasks use the same two phases with different prompts: the answer is read into
 four sections instead of mined for brands, and a database trigger refuses any brand
 observation written against a perception task. A perception answer names the brand's
@@ -206,8 +229,10 @@ One pass is: reap, claim, call, persist, finalise.
   candidate whose provider is at its cap. Account settings saves a cap per provider in
   `app_state`, from 1 to 15 because no batch could reach more, and each pass reads it, so a
   change needs no restart. A valid `OVERHEARD_MAX_INFLIGHT_<PROVIDER>` wins over the saved
-  cap, and the saved cap over the default (`worker/concurrency.ts`). A cap set too high costs
-  429s and backoff, never money, because providers do not bill a rejected request. Google
+  cap, and the saved cap over the default (`worker/concurrency.ts`). A provider in
+  subscription mode defaults to 3, because each of its calls is a whole process. A cap set
+  too high costs 429s and backoff, never money, because providers do not bill a rejected
+  request. Google
   publishes no numeric rates, so its 3 is a judgement call.
 - **Claiming is one write transaction** opened with `BEGIN IMMEDIATE`: select, status
   change, lock stamp and attempt increment together. SQLite has no `FOR UPDATE SKIP LOCKED`,

@@ -1,33 +1,44 @@
 /**
  * The application settings screen: which provider keys the environment holds,
  * whether they work, where the database file is and how big it has grown,
- * whether the worker and the schedule sweep are running, and the install-wide
- * limits: the run size limit and each provider's calls in flight.
+ * whether the worker and the schedule sweep are running, the install-wide
+ * limits: the run size limit and each provider's calls in flight, whether the
+ * icon rebuilds before it opens the app, and Quit.
  *
  * Nothing here returns a key value, a prefix or a length, so a screenshot of
  * the settings page can go into a bug report without redaction.
  */
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
+import { shutdown } from "../../boot";
 import { databasePathFromEnv, type Driver } from "../../db/driver";
 import type { Provider } from "../../db/types";
-import { DEFAULT_PROVIDER_CAPS } from "../../logic/claim-tasks";
 import { effectiveCallLimit } from "../../logic/plan-run";
 import { CALL_LIMIT_MAX, CALL_LIMIT_MIN, DEFAULT_MAX_PLANNED_CALLS } from "../../logic/types";
-import { effectiveCaps, envCap, INFLIGHT_CAP_ENV } from "../../worker/concurrency";
-import { keyStatus, type ProviderKeyStatus } from "../../worker/keys";
+import { defaultCap, effectiveCaps, envCap, INFLIGHT_CAP_ENV } from "../../worker/concurrency";
+import { cliSignedIn } from "../../worker/cli-provider";
+import { keyStatus, providerCli, type ProviderKeyStatus } from "../../worker/keys";
 import { mockProvidersEnabled } from "../../worker/mock-provider";
 import { workerStatus, type StartWorkerOptions } from "../../worker/loop";
 import { getStoredCaps } from "../../worker/queries";
 import { schedulerStatus } from "../../worker/scheduler-loop";
-import { nowIso } from "./shared";
+import { nowIso, toSqlBool } from "./shared";
 import { INFLIGHT_CAP_MAX, INFLIGHT_CAP_MIN, isInflightCap } from "@/lib/inflight-caps";
 
 export type { ProviderKeyStatus, StartWorkerOptions };
 
-/** Which providers have a key, as booleans. Never a value. */
-export function providerKeyStatus(): ProviderKeyStatus[] {
-  return keyStatus();
+/**
+ * Which providers have a key, and whether each subscription-mode tool is
+ * signed in, as booleans. Never a value. The status is read on every call, as
+ * a key is, so signing in while the app runs shows on the next read.
+ */
+export async function providerKeyStatus(): Promise<ProviderKeyStatus[]> {
+  return Promise.all(
+    keyStatus().map(async (row) => {
+      const cli = row.source === "cli" ? providerCli(row.provider) : null;
+      return cli ? { ...row, signedIn: await cliSignedIn(cli) } : row;
+    }),
+  );
 }
 
 export interface DatabaseInfo {
@@ -165,7 +176,7 @@ export function inflightCaps(db: Driver): InflightCapView[] {
   return (Object.keys(CAP_COLUMN) as Provider[]).map((provider) => ({
     provider,
     effective: effective[provider],
-    defaultCap: DEFAULT_PROVIDER_CAPS[provider],
+    defaultCap: defaultCap(provider),
     stored: stored[provider],
     envName: INFLIGHT_CAP_ENV[provider],
     envOverrides: envCap(provider) !== null,
@@ -200,5 +211,49 @@ export function setInflightCap(db: Driver, provider: Provider, cap: number | nul
       nowIso(),
     );
   }
+  return { ok: true };
+}
+
+/**
+ * Whether the icon rebuilds a stale build before starting the app. A missing
+ * row reads as on, the column's default, which is also how server/index.mjs
+ * reads anything it cannot find.
+ */
+export function rebuildOnOpen(db: Driver): { on: boolean } {
+  const row = db
+    .prepare("SELECT rebuild_on_open FROM app_state WHERE id = 1")
+    .get<{ rebuild_on_open: number }>();
+  return { on: row?.rebuild_on_open !== 0 };
+}
+
+export function setRebuildOnOpen(db: Driver, on: boolean): { ok: true } {
+  const changes = db
+    .prepare("UPDATE app_state SET rebuild_on_open = ?, updated_at = ? WHERE id = 1")
+    .run(toSqlBool(on), nowIso()).changes;
+  if (changes === 0) {
+    // Migration 0003 inserts the row, so this only runs on a database that
+    // lost it.
+    db.prepare("INSERT INTO app_state (id, rebuild_on_open, updated_at) VALUES (1, ?, ?)").run(
+      toSqlBool(on),
+      nowIso(),
+    );
+  }
+  return { ok: true };
+}
+
+/** Long enough for the reply to reach the browser before the process goes. */
+export const QUIT_DELAY_MS = 300;
+
+/**
+ * Stops this process, for the menu's Quit. It is the only way to stop an
+ * Overheard AI the icon started, because that one has no console to press
+ * Ctrl-C in. A call in flight is abandoned and boot recovery requeues it next
+ * time, the same guarantee Ctrl-C gives.
+ */
+export function quit(): { ok: true } {
+  setTimeout(() => {
+    shutdown();
+    process.exit(0);
+  }, QUIT_DELAY_MS);
   return { ok: true };
 }
