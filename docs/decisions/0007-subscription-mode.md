@@ -38,10 +38,12 @@ Calls in subscription mode are logged at $0, and the catalogue prices reach the 
 zero for those providers, so every estimate agrees with the spend the worker logs. Tokens are
 still logged. A provider in subscription mode starts at 3 calls in flight.
 
-Two failure codes are new. `CLI_SIGN_IN:<provider>` covers a command that cannot be found,
+Three failure codes are new. `CLI_SIGN_IN:<provider>` covers a command that cannot be found,
 started or signed in, and is not retried. `PLAN_LIMIT:<provider>` covers a plan at its usage
-limit, and is retried with the worker's backoff like a 429. Both read the tools' own wording,
-which neither tool documents.
+limit, and is retried with the worker's backoff like a 429. `CLI_SETTING_REFUSED:<provider>`
+covers a tool that refuses a setting Overheard passes, because its version and Overheard's
+disagree, and is not retried, since every call passes the same settings. All three read the
+tools' own wording, which neither tool documents.
 
 ## Why
 
@@ -81,8 +83,9 @@ and both are built to run non-interactively (`claude -p`, `codex exec`).
   instructions and the question.
 - Plan limits replace dollars, and neither company publishes them.
 - Each tool's flags and output can change between versions. The parsers are lenient and
-  tested against recorded output, and the setup check names a refused flag in its detail.
-  Tested with Claude Code 2.1.284 and Codex 0.160.1. Codex features are switched off as
+  tested against recorded output. A refused setting fails at once, and the setup check and
+  the run page say to update the tool, with the setting in the detail. Tested with Claude Code
+  2.1.284 and 2.1.285 and Codex 0.160.1 and 0.163.0. Codex features are switched off as
   `-c features.<name>=false`, which every version accepts, not `--disable <name>`, which
   rejects a name the version does not know.
 - Plans are sized for one person's ordinary use. Anthropic allows a user to sign in to the

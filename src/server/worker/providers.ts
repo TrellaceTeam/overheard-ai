@@ -7,6 +7,7 @@ import { CATALOGUE } from "../db/seed-models";
 import {
   classifySearchFailure,
   cliNotReady,
+  cliSettingRefused,
   extractorOk,
   planLimited,
   planSearchOk,
@@ -944,8 +945,9 @@ export async function callProvider({
 
 /**
  * A subscription-mode failure as the ProviderError the worker records. A
- * missing or signed-out tool cannot fix itself, so it is not retried. A plan
- * at its limit is retried with the worker's backoff, like a 429.
+ * missing or signed-out tool cannot fix itself, and neither can one that
+ * refuses a setting, so neither is retried. A plan at its limit is retried
+ * with the worker's backoff, like a 429.
  */
 function cliProviderError(provider: Provider, failure: CliFailure): ProviderError {
   const message = scrubError(failure.message);
@@ -958,6 +960,12 @@ function cliProviderError(provider: Provider, failure: CliFailure): ProviderErro
       );
     case "plan_limit":
       return new ProviderError(`PLAN_LIMIT: ${message}`, 429, failureCode("PLAN_LIMIT", provider));
+    case "setting_refused":
+      return new ProviderError(
+        `CLI_SETTING_REFUSED: ${message}`,
+        400,
+        failureCode("CLI_SETTING_REFUSED", provider),
+      );
     case "timeout":
       return new ProviderError(`TIMEOUT ${message}`, 0, "TIMEOUT");
     case "refused":
@@ -989,7 +997,7 @@ async function callThroughCli(
 }
 
 /**
- * A probe's failure as a verdict. Subscription mode's own two failures get
+ * A probe's failure as a verdict. Subscription mode's own three failures get
  * sentences about the command and the plan, and everything else the
  * provider's API wording.
  */
@@ -1000,6 +1008,9 @@ function probeVerdict(provider: Provider, err: unknown): SearchCheckResult {
   const base = err instanceof ProviderError ? failureCodeBase(err.code) : null;
   if (isCliProvider(provider) && base === "CLI_SIGN_IN") return cliNotReady(provider, message);
   if (isCliProvider(provider) && base === "PLAN_LIMIT") return planLimited(provider, message);
+  if (isCliProvider(provider) && base === "CLI_SETTING_REFUSED") {
+    return cliSettingRefused(provider, message);
+  }
   return classifySearchFailure(provider, status, message);
 }
 

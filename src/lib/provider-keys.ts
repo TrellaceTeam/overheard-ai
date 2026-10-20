@@ -47,8 +47,9 @@ export function keyEnvNamesSafe(slug: string): string | null {
  * signed in with the user's plan, instead of its API with a key. Only the two
  * tools this build speaks have an entry. `env` names the variable that turns
  * the mode on and holds the command, `command` is the name the tool installs
- * under, `tool` is what its maker calls it, `plan` is the plan it bills, and
- * `signIn` is the command that signs it in.
+ * under, `tool` is what its maker calls it, `plan` is the plan it bills,
+ * `signIn` is the command that signs it in, and `update` is the usual way to
+ * update it.
  */
 export const PROVIDER_CLI = {
   anthropic: {
@@ -57,6 +58,7 @@ export const PROVIDER_CLI = {
     tool: "Claude Code",
     plan: "Claude",
     signIn: "claude auth login",
+    update: "claude update",
   },
   openai: {
     env: "OVERHEARD_OPENAI_CLI",
@@ -64,6 +66,7 @@ export const PROVIDER_CLI = {
     tool: "Codex",
     plan: "ChatGPT",
     signIn: "codex login",
+    update: "npm install -g @openai/codex@latest",
   },
 } as const;
 

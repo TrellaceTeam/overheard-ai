@@ -41,11 +41,14 @@ export interface CliCall {
 
 /**
  * Why a call failed, sorted by what the user can do about it. `refused` is the
- * provider's own HTTP refusal, passed through by the tool.
+ * provider's own HTTP refusal, passed through by the tool. `setting_refused`
+ * is the tool itself refusing an argument this module passes, because its
+ * version and this build disagree.
  */
 export type CliFailure =
   | { kind: "sign_in"; message: string }
   | { kind: "plan_limit"; message: string }
+  | { kind: "setting_refused"; message: string }
   | { kind: "timeout"; message: string }
   | { kind: "refused"; status: number; message: string }
   | { kind: "failed"; message: string };
@@ -310,12 +313,26 @@ export function readCodex(stdout: string): CliReading {
 }
 
 /**
+ * A tool's argument parser refusing what it was given. Claude Code parses its
+ * arguments with Commander ("error: unknown option '--x'") and Codex with clap
+ * ("error: unexpected argument '--x' found"), and both start the line with
+ * "error: ", which a provider's own refusal does not.
+ */
+const SETTING_REFUSED =
+  /^error: (?:unknown option|unexpected argument|unrecognized (?:option|argument)|invalid value|option '[^']*' argument '[^']*' is invalid)/im;
+
+/**
  * Sorts a failed call by the tools' own wording. Neither tool documents its
  * messages, so these are the phrasings seen from Claude Code 2.1 and Codex
  * 0.160 ("Not logged in · Please run /login", "401 Unauthorized", "You've hit
  * your usage limit"). Anything else keeps the tool's message for the detail.
  */
 export function classifyCliFailure(message: string, status: number | null): CliFailure {
+  // First, so a refused option whose name holds "limit" or "login" is not
+  // read as a plan or sign-in problem.
+  if (status === null && SETTING_REFUSED.test(message)) {
+    return { kind: "setting_refused", message };
+  }
   if (
     status === 401 ||
     /not logged in|\/login|(?:log|sign) ?in again|authentication_failed|unauthori[sz]ed/i.test(
@@ -434,8 +451,15 @@ export async function listCliModels(target: CliTarget): Promise<string[] | null>
   }
 }
 
-function lastLines(text: string): string {
-  return text.trim().split(/\r?\n/).slice(-5).join("\n");
+/**
+ * Five lines of what a failed tool printed on stderr, for the detail. A tool
+ * puts its error last, after any warnings, except that an argument parser puts
+ * it first and follows it with usage text.
+ */
+function stderrMessage(stderr: string): string {
+  const refused = SETTING_REFUSED.exec(stderr);
+  const lines = (refused ? stderr.slice(refused.index) : stderr).trim().split(/\r?\n/);
+  return (refused ? lines.slice(0, 5) : lines.slice(-5)).join("\n");
 }
 
 /**
@@ -490,7 +514,7 @@ export async function callCli(call: CliCall, launch?: Launch): Promise<CliOutcom
     const reading = provider === "anthropic" ? readClaude(exit.stdout) : readCodex(exit.stdout);
     if (reading.ok) return reading;
     const message =
-      reading.message.trim() || lastLines(exit.stderr) || "the command printed nothing";
+      reading.message.trim() || stderrMessage(exit.stderr) || "the command printed nothing";
     return { ok: false, failure: classifyCliFailure(message, reading.status) };
   } finally {
     try {

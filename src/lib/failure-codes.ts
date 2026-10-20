@@ -26,6 +26,11 @@ export const FAILURE_CODES = [
   "CLI_SIGN_IN",
   /** Subscription mode: the user's plan is at its usage limit. Param: provider slug. */
   "PLAN_LIMIT",
+  /**
+   * Subscription mode: the provider's command refused a setting this build
+   * passes it, because the two versions disagree. Param: provider slug.
+   */
+  "CLI_SETTING_REFUSED",
   /** A model names a provider this build has no adapter for. Param: provider slug. */
   "UNSUPPORTED_PROVIDER",
   /** No key for any model that can read answers. */

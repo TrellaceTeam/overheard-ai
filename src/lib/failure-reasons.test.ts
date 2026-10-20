@@ -300,7 +300,11 @@ describe("classifyFailure, coded rows", () => {
         reason.key === "unknown" && reason.title === "We could not classify this failure";
       if (deliberateDefaults.has(base)) {
         expect(isDefault, base).toBe(true);
-      } else if (["MISSING_CREDENTIAL", "HTTP", "CLI_SIGN_IN", "PLAN_LIMIT"].includes(base)) {
+      } else if (
+        ["MISSING_CREDENTIAL", "HTTP", "CLI_SIGN_IN", "PLAN_LIMIT", "CLI_SETTING_REFUSED"].includes(
+          base,
+        )
+      ) {
         // Param-bearing: the bare base defaults, the param form does not.
         expect(isDefault, base).toBe(true);
       } else {
@@ -332,6 +336,17 @@ describe("classifyFailure, coded rows", () => {
     });
     expect(reason.owner).toBe("provider");
     expect(reason.title).toBe("Your ChatGPT plan reached its usage limit");
+  });
+
+  it("tells the user to update a tool that refused a setting", () => {
+    const reason = classifyFailure({
+      code: failureCode("CLI_SETTING_REFUSED", "openai"),
+      error: "CLI_SETTING_REFUSED: error: unexpected argument '--no-such-flag' found",
+    });
+    expect(reason.owner).toBe("you");
+    expect(reason.title).toBe("Codex refused a setting Overheard AI sends");
+    expect(reason.advice).toContain("Update Codex with npm install -g @openai/codex@latest");
+    expect(reason.detail).toContain("'--no-such-flag'");
   });
 
   it("gives a subscription-mode code for a provider without a command the default card", () => {

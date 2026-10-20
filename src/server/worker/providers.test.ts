@@ -1509,6 +1509,30 @@ process.exit(1);`;
     expect(extractor.message).toBe("The codex command could not answer with your ChatGPT plan.");
   });
 
+  it("fails a refused setting at once, and the setup check says to update the tool", async () => {
+    // What Claude Code 2.1.285 prints for a flag it does not know.
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand(
+      `process.stderr.write("error: unknown option '--no-such-flag'\\n"); process.exit(1);`,
+    );
+    const error = await callProvider({
+      provider: "anthropic",
+      modelId: "claude-sonnet-5",
+      apiKey: "unused",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      webSearch: true,
+    }).catch((err: unknown) => err);
+    expect(error).toMatchObject({ code: "CLI_SETTING_REFUSED:anthropic", retryable: false });
+
+    const verdict = await searchCheck("anthropic", "claude-sonnet-5");
+    expect(verdict.message).toBe("Claude Code refused a setting Overheard AI sends.");
+    expect(verdict.hint).toBe(
+      "Update it with claude update in a terminal, or the way you installed it, and check again. If it still refuses, update Overheard AI.",
+    );
+    expect(verdict.detail).toContain("'--no-such-flag'");
+  });
+
   it("presses for a search in words, since neither command can force one", () => {
     expect(canForceSearch("openai", "gpt-5.6-terra")).toBe(true);
     process.env["OVERHEARD_OPENAI_CLI"] = standInCommand();

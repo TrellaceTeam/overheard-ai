@@ -178,8 +178,10 @@ What changes:
   automated work. Read [Anthropic's](https://code.claude.com/docs/en/legal-and-compliance) and
   [OpenAI's](https://developers.openai.com/codex/auth) terms for your plan before you turn this
   on. Use API keys to measure brands for anyone else.
-- Tested with Claude Code 2.1.284 and Codex 0.160.1. If an older tool refuses a flag, update
-  it.
+- Tested with Claude Code 2.1.284 and 2.1.285 and Codex 0.160.1 and 0.163.0. If a tool
+  refuses a setting, the setup check and the run page say so. Update it with `claude update`
+  or `npm install -g @openai/codex@latest`, or the way you installed it. An old install can
+  also fail before it answers at all, and updating fixes that too.
 
 [ADR 0007](docs/decisions/0007-subscription-mode.md) records why it works this way.
 

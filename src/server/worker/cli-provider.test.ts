@@ -230,10 +230,27 @@ describe("classifyCliFailure", () => {
       status: 400,
       message: "model is not supported",
     });
-    expect(classifyCliFailure("error: unknown option '--safe-mode'", null)).toEqual({
+    expect(classifyCliFailure("stream disconnected before completion", null)).toEqual({
       kind: "failed",
-      message: "error: unknown option '--safe-mode'",
+      message: "stream disconnected before completion",
     });
+  });
+
+  it("reads each tool's refusal of a setting as its own kind", () => {
+    // Claude Code 2.1.285 and Codex 0.163.0, given a flag neither knows.
+    expect(classifyCliFailure("error: unknown option '--no-such-flag'", null)).toEqual({
+      kind: "setting_refused",
+      message: "error: unknown option '--no-such-flag'",
+    });
+    expect(classifyCliFailure("error: unexpected argument '--no-such-flag' found", null).kind).toBe(
+      "setting_refused",
+    );
+    // A refused option is not a sign-in or a plan problem, whatever it is called.
+    expect(classifyCliFailure("error: unknown option '--rate-limit'", null).kind).toBe(
+      "setting_refused",
+    );
+    // The provider's own refusal quotes a status and stays a refusal.
+    expect(classifyCliFailure("error: unknown option in request", 400).kind).toBe("refused");
   });
 });
 
@@ -390,6 +407,26 @@ process.stdin.on("end", () => {
       ok: false,
       failure: { kind: "sign_in", message: "unexpected status 401 Unauthorized" },
     });
+  });
+
+  it("keeps a refused setting's line, which an argument parser prints above its usage text", async () => {
+    // What Codex 0.163.0 prints for a flag it does not know, and exits 2.
+    process.env["FAKE_TOOL_OUTPUT"] = [
+      "error: unexpected argument '--no-such-flag' found",
+      "",
+      "  tip: to pass '--no-such-flag' as a value, use '-- --no-such-flag'",
+      "",
+      "Usage: codex exec [OPTIONS] [PROMPT]",
+      "",
+      "For more information, try '--help'.",
+    ].join("\n");
+    const outcome = await callCli(
+      call({ target: { provider: "openai", command: "codex" } }),
+      standIn("process.stderr.write(process.env.FAKE_TOOL_OUTPUT); process.exit(2);"),
+    );
+    if (outcome.ok) throw new Error("the stand-in should have failed");
+    expect(outcome.failure.kind).toBe("setting_refused");
+    expect(outcome.failure.message).toContain("'--no-such-flag'");
   });
 
   it("names the variable to set when the command cannot be found", async () => {

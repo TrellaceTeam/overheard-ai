@@ -109,6 +109,18 @@ function planLimitCard(slug: string): Card | null {
   };
 }
 
+/** Retrying cannot help: the same setting goes with every call. */
+function cliSettingRefusedCard(slug: string): Card | null {
+  if (!isCliProvider(slug)) return null;
+  const cli = PROVIDER_CLI[slug];
+  return {
+    key: `cli-setting-refused:${slug}`,
+    owner: "you",
+    title: `${cli.tool} refused a setting Overheard AI sends`,
+    advice: `This version of ${cli.tool} and this copy of Overheard AI disagree, so every call fails the same way. Update ${cli.tool} with ${cli.update} in a terminal, or the way you installed it, then retry the failed calls. If it still refuses, update Overheard AI. The technical detail below names the setting.`,
+  };
+}
+
 function noExtractionCredentialCard(): Card {
   return {
     key: "no-extraction-credential",
@@ -300,6 +312,8 @@ function classifyCode(parsed: ParsedFailureCode): Card | null {
       return parsed.param ? cliSignInCard(parsed.param) : null;
     case "PLAN_LIMIT":
       return parsed.param ? planLimitCard(parsed.param) : null;
+    case "CLI_SETTING_REFUSED":
+      return parsed.param ? cliSettingRefusedCard(parsed.param) : null;
     case "NO_EXTRACTION_CREDENTIAL":
       return noExtractionCredentialCard();
     case "EMPTY_ANSWER":

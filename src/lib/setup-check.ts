@@ -355,6 +355,17 @@ export function planLimited(provider: CliProvider, detail: string): SearchCheckR
   };
 }
 
+/** Subscription mode: the command refused a setting, so its version and this build disagree. */
+export function cliSettingRefused(provider: CliProvider, detail: string): SearchCheckResult {
+  const cli = PROVIDER_CLI[provider];
+  return {
+    status: "unknown",
+    message: `${cli.tool} refused a setting Overheard AI sends.`,
+    hint: `Update it with ${cli.update} in a terminal, or the way you installed it, and check again. If it still refuses, update Overheard AI.`,
+    detail,
+  };
+}
+
 /** The extractor answers a plain call: no search involved, so no search claim. */
 export function extractorOk(): SearchCheckResult {
   return { status: "ok", message: "This model answered a short test call." };
