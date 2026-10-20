@@ -1002,6 +1002,8 @@ async function callThroughCli(
  * provider's API wording.
  */
 function probeVerdict(provider: Provider, err: unknown): SearchCheckResult {
+  // A probe can throw anything. Both casts read one optional field, and a
+  // throw without it reads as status 0 and an empty message.
   const raw = (err as { status?: unknown } | null)?.status;
   const status = typeof raw === "number" ? raw : 0;
   const message = scrubError((err as Error | null)?.message ?? "");

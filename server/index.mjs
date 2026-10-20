@@ -26,9 +26,10 @@
  * its own, `vite dev` reads it, and `npm start` and the icon pass Node
  * --env-file-if-exists=.env so they agree. In all of them a variable already
  * in the shell wins over the file. Running `node server/index.mjs` directly
- * skips .env at start, which is what you want when passing env inline. Provider
- * keys alone are then re-read from .env while the app runs
- * (src/server/worker/env-file.ts), still behind any value the shell set.
+ * skips .env at start, which is what you want when passing env inline. Only
+ * the provider keys and the subscription-mode command variables are then
+ * re-read from .env while the app runs (src/server/worker/env-file.ts), still
+ * behind any value the shell set.
  */
 import { spawn } from "node:child_process";
 import {
@@ -188,8 +189,10 @@ function needsBuild() {
 /**
  * Account settings' "Rebuild after the code changes" switch, read straight
  * from the database because the app that normally reads it is the build in
- * question. An unreadable database or a column older migrations lack reads as
- * on, the default.
+ * question. That is why this skips the driver adapter, which CONTRIBUTING
+ * allows here alone. The default path is the adapter's, and driver.test.ts
+ * checks the two match. An unreadable database or a column older migrations
+ * lack reads as on, the default.
  */
 function rebuildAllowed() {
   const path = process.env.DATABASE_PATH ?? "./data/overheard.db";

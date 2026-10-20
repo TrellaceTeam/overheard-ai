@@ -181,6 +181,8 @@ function jsonLines<T>(stdout: string): T[] {
   for (const line of stdout.split(/\r?\n/)) {
     if (!line.trim().startsWith("{")) continue;
     try {
+      // The event types name every field optional, and the readers check each
+      // one before use, so an event of another shape reads as missing fields.
       events.push(JSON.parse(line) as T);
     } catch {
       // A partial last line from a killed process.
@@ -451,6 +453,7 @@ export async function cliSignedIn(target: CliTarget): Promise<boolean | null> {
   const text = `${exit.stdout}\n${exit.stderr}`;
   if (target.provider === "anthropic") {
     try {
+      // Optional and unknown, so the typeof below is the only thing trusted.
       const status = JSON.parse(exit.stdout) as { loggedIn?: unknown };
       if (typeof status.loggedIn === "boolean") return status.loggedIn;
     } catch {
@@ -483,6 +486,8 @@ export async function listCliModels(target: CliTarget): Promise<string[] | null>
   });
   if (exit.timedOut || exit.startError !== null) return null;
   try {
+    // Every field optional and each slug checked below, so another shape reads
+    // as no list. A `models` that is not an array throws, which also does.
     const parsed = JSON.parse(exit.stdout) as { models?: Array<{ slug?: unknown }> };
     const ids = (parsed.models ?? []).flatMap((model) =>
       typeof model.slug === "string" ? [model.slug] : [],

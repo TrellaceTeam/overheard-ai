@@ -83,7 +83,10 @@ What it fabricates, and how that stays visible:
   cast is genuinely needed, write the reason above it.
 - **SQLite access goes through the driver adapter** in `src/server/db/driver.ts`. No native
   addon, no second SQLite package. See
-  [ADR 0001](docs/decisions/0001-runtime-and-sqlite-driver.md).
+  [ADR 0001](docs/decisions/0001-runtime-and-sqlite-driver.md). The one exception is
+  `server/index.mjs`, which reads the rebuild switch with the runtime's own `node:sqlite` or
+  `bun:sqlite` before it loads the build that holds the adapter. See
+  [ADR 0008](docs/decisions/0008-one-click-open.md).
 - **Schema changes are new numbered migrations** under `src/server/db/migrations/`. Never
   edit a migration that has shipped. Somebody's database has already applied it.
 
