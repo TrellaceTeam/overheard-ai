@@ -38,6 +38,7 @@ const SHIPPED = [
   "0012_answer_model",
   "0013_model_superseded",
   "0014_rebuild_on_open_setting",
+  "0015_run_task_retry_reason",
 ];
 
 describe("migrate", () => {
@@ -167,6 +168,7 @@ describe("migrate", () => {
       "0012_answer_model",
       "0013_model_superseded",
       "0014_rebuild_on_open_setting",
+      "0015_run_task_retry_reason",
     ]);
 
     const count = (sql: string) => handle.prepare(sql).get<{ c: number }>()!.c;
@@ -219,6 +221,7 @@ describe("migrate", () => {
       "0012_answer_model",
       "0013_model_superseded",
       "0014_rebuild_on_open_setting",
+      "0015_run_task_retry_reason",
     ]);
 
     const rows = () =>
@@ -252,6 +255,7 @@ describe("migrate", () => {
       "0012_answer_model",
       "0013_model_superseded",
       "0014_rebuild_on_open_setting",
+      "0015_run_task_retry_reason",
     ]);
 
     const row = handle
@@ -292,6 +296,7 @@ describe("migrate", () => {
       "0012_answer_model",
       "0013_model_superseded",
       "0014_rebuild_on_open_setting",
+      "0015_run_task_retry_reason",
     ]);
 
     const rows = handle
@@ -329,7 +334,11 @@ describe("migrate", () => {
       )
       .run();
 
-    expect(migrate(handle)).toEqual(["0013_model_superseded", "0014_rebuild_on_open_setting"]);
+    expect(migrate(handle)).toEqual([
+      "0013_model_superseded",
+      "0014_rebuild_on_open_setting",
+      "0015_run_task_retry_reason",
+    ]);
     const flag = (modelId: string) =>
       handle
         .prepare("SELECT superseded FROM models WHERE model_id = ?")
@@ -351,7 +360,7 @@ describe("migrate", () => {
       builtInMigrations().filter((m) => m.version < "0014"),
     );
 
-    expect(migrate(handle)).toEqual(["0014_rebuild_on_open_setting"]);
+    expect(migrate(handle)).toEqual(["0014_rebuild_on_open_setting", "0015_run_task_retry_reason"]);
     const flag = () =>
       handle
         .prepare("SELECT rebuild_on_open FROM app_state WHERE id = 1")
@@ -360,6 +369,36 @@ describe("migrate", () => {
     expect(() =>
       handle.prepare("UPDATE app_state SET rebuild_on_open = 2 WHERE id = 1").run(),
     ).toThrow();
+  });
+
+  it("gives an existing task no retry reason, since none was recorded", () => {
+    const handle = db();
+    migrate(
+      handle,
+      builtInMigrations().filter((m) => m.version < "0015"),
+    );
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Acme Analytics')").run();
+    handle
+      .prepare(
+        "INSERT INTO runs (id, project_id, planned_calls, config_snapshot) VALUES ('r1', 'p1', 2, '{}')",
+      )
+      .run();
+    handle
+      .prepare(
+        "INSERT INTO models (id, provider, model_id, display_name) VALUES ('m1', 'openai', 'assistant-alpha', 'Assistant Alpha')",
+      )
+      .run();
+    handle
+      .prepare(
+        "INSERT INTO run_tasks (id, run_id, project_id, model_id, iteration, next_attempt_at) VALUES ('t1', 'r1', 'p1', 'm1', 1, '2026-01-01T00:00:00.000Z')",
+      )
+      .run();
+
+    expect(migrate(handle)).toEqual(["0015_run_task_retry_reason"]);
+    const row = handle
+      .prepare("SELECT retry_failure_code, retry_error FROM run_tasks WHERE id = 't1'")
+      .get<{ retry_failure_code: string | null; retry_error: string | null }>();
+    expect(row).toEqual({ retry_failure_code: null, retry_error: null });
   });
 
   it("records nothing when a migration throws", () => {

@@ -637,6 +637,8 @@ export async function processTask(
     console.error("[worker] task failed", {
       task_id: task.id,
       run_id: task.run_id,
+      code,
+      retrying: retryable,
       message: scrubError(message),
     });
   }

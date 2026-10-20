@@ -157,6 +157,8 @@ function task(patch: Partial<RunTaskRow> = {}): RunTaskRow {
     provider_cost_usd: null,
     error: null,
     failure_code: null,
+    retry_failure_code: null,
+    retry_error: null,
     created_at: "2026-01-01T00:00:00.000Z",
     ...patch,
   };

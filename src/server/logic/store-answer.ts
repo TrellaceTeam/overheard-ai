@@ -136,7 +136,9 @@ export function failTask(db: Driver, taskId: string, code: FailureCode, detail: 
 /**
  * Returns a task to its pre-claim status with a backoff gate: in_flight to
  * queued, extracting to answered. Never in_flight to answered. The worker
- * passes backoffAt() as `nextAttemptAt`.
+ * passes backoffAt() as `nextAttemptAt`. The failure is written twice: as the
+ * task's current one, which a later success clears, and as its retry reason,
+ * which stays.
  */
 export function releaseTaskForRetry(
   db: Driver,
@@ -153,9 +155,11 @@ export function releaseTaskForRetry(
               ELSE status END,
             error = ?,
             failure_code = ?,
+            retry_error = ?,
+            retry_failure_code = ?,
             locked_at = NULL,
             locked_by = NULL,
             next_attempt_at = ?
       WHERE id = ?`,
-  ).run(detail, code, nextAttemptAt, taskId);
+  ).run(detail, code, detail, code, nextAttemptAt, taskId);
 }
