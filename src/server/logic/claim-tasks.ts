@@ -114,7 +114,7 @@ const SELECT_CLAIMED = `
   SELECT t.id, t.run_id, t.project_id, t.prompt_id, t.model_id, t.iteration, t.question_text,
          t.is_perception, t.status, t.attempts, t.next_attempt_at, t.locked_at, t.locked_by,
          t.answer_text, t.answer_tokens, t.latency_ms, t.provider_cost_usd, t.error,
-         t.failure_code, t.created_at,
+         t.failure_code, t.retry_failure_code, t.retry_error, t.created_at,
          m.provider AS provider,
          m.model_id AS provider_model_id,
          m.supports_web_search AS supports_web_search
