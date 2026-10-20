@@ -10,6 +10,15 @@ import {
 } from "@/lib/provider-keys";
 import type { KeyStatus, ProviderSlug } from "@/components/types";
 
+/**
+ * A subscription-mode row whose tool answered its status command signed out.
+ * It still routes calls, which would fail on the sign-in card, so the row says
+ * so before anyone spends a check or a run on it.
+ */
+function signedOut(status: KeyStatus): boolean {
+  return status.source === "cli" && status.signedIn === false;
+}
+
 /** What stands behind a configured row. */
 function sourceLabel(status: KeyStatus): string {
   if (status.source === "mock") return "mock provider";
@@ -35,7 +44,8 @@ function sourceLabel(status: KeyStatus): string {
  * With OVERHEARD_MOCK_PROVIDERS=1 the offline seam answers for every provider,
  * so `configured` is true with no key anywhere. In subscription mode a
  * provider's command line tool answers on the user's plan, also with no key.
- * `source` tells the row which it is.
+ * `source` tells the row which it is, and `signedIn` whether that tool is
+ * signed in yet.
  */
 export function KeyStatusList({
   statuses,
@@ -72,7 +82,15 @@ export function KeyStatusList({
         <div key={status.provider} className="flex flex-wrap items-center gap-3 p-4">
           <span className="min-w-24 text-sm font-medium">{providerLabel(status.provider)}</span>
 
-          {status.configured ? (
+          {signedOut(status) && isCliProvider(status.provider) ? (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <X className="size-3.5" />
+              {PROVIDER_CLI[status.provider].tool} is installed but not signed in. Run{" "}
+              <code className="num text-foreground">{PROVIDER_CLI[status.provider].signIn}</code> in
+              a terminal and sign in with your {PROVIDER_CLI[status.provider].plan} plan, then check
+              again.
+            </span>
+          ) : status.configured ? (
             <span className="inline-flex items-center gap-1 text-xs text-primary">
               <Check className="size-3.5" />
               {/* "key found" on a machine with no keys at all, said three times
@@ -111,7 +129,7 @@ export function KeyStatusList({
                 )}
               </span>
             )}
-            {showChecks && status.configured && (
+            {showChecks && status.configured && !signedOut(status) && (
               <Button
                 type="button"
                 size="sm"
@@ -127,15 +145,18 @@ export function KeyStatusList({
             )}
           </div>
 
-          {status.configured && (
+          {status.configured && !signedOut(status) && (
             <ModelsOnKey report={availability?.[status.provider]} names={modelNames} />
           )}
         </div>
       ))}
-      {onRecheckKeys && statuses.some((status) => !status.configured) && (
+      {onRecheckKeys && statuses.some((status) => !status.configured || signedOut(status)) && (
         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-xs text-muted-foreground">
-            Added a key to .env? Check again to pick it up. There is no need to restart.
+            {statuses.some(signedOut)
+              ? "Signed in, or added a key to .env?"
+              : "Added a key to .env?"}{" "}
+            Check again to pick it up. There is no need to restart.
           </p>
           <Button type="button" size="sm" variant="outline" onClick={onRecheckKeys}>
             Check again

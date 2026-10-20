@@ -21,7 +21,10 @@ const selectionInput = z.object({
   assistantModelIds: z.array(z.string().min(1)).min(1),
 });
 
-/** Which providers have a key. Booleans only, never a value or a length. */
+/**
+ * Which providers have a key, and whether each plan tool is signed in.
+ * Booleans only, never a value or a length.
+ */
 export const keyStatus = createServerFn({ method: "GET" }).handler(async () => {
   const { providerKeyStatus } = await import("./ops/settings");
   return providerKeyStatus();

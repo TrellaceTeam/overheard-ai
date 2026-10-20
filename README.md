@@ -146,7 +146,7 @@ your plan's usage limits instead of a bill.
    command is installed. A key, when set, wins.
 3. Account settings now shows "via claude, on your Claude plan". Its Check button makes one
    real call with web search through the tool, and the ChatGPT row lists the models your
-   plan offers.
+   plan offers. A tool that is installed but not signed in says so, with the command to run.
 
 If the app runs where the command isn't on your PATH, such as a scheduled task, put its full
 path in `OVERHEARD_ANTHROPIC_CLI` or `OVERHEARD_OPENAI_CLI`. Empty either line to turn the

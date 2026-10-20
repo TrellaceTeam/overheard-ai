@@ -40,6 +40,7 @@ export function useProviderChecks(
     configured: row.configured,
     source: row.source,
     problem: row.problem ?? null,
+    signedIn: row.signedIn ?? null,
     result: results[row.provider] ?? { state: "untested" },
   }));
 

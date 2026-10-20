@@ -82,6 +82,17 @@ describe("modelAvailability", () => {
     expect(openai.missing).toContain("gpt-6-astra");
   });
 
+  it("lists no plan models while Codex is signed out, though its list command answers", async () => {
+    // Codex 0.163.0 prints its catalogue signed out, and says "Not logged in"
+    // on stderr to `codex login status`.
+    process.env["OVERHEARD_OPENAI_CLI"] =
+      standInCommand(`const args = process.argv.slice(2).join(" ");
+if (args === "login status") { process.stderr.write("Not logged in\\n"); process.exit(1); }
+process.stdout.write(JSON.stringify({ models: [{ slug: "gpt-6.1-sol" }] }));`);
+    const report = await modelAvailability(db);
+    expect(report.openai).toEqual({ status: "cli" });
+  });
+
   it("offers every model when a plan's command has no list to read", async () => {
     process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand();
     process.env["OVERHEARD_OPENAI_CLI"] = standInCommand(`process.stdout.write("not json");`);

@@ -14,7 +14,7 @@ import type { Provider } from "../../db/types";
 import { PROVIDERS, providerCli, resolveProviderKey } from "../../worker/keys";
 import { mockProvidersEnabled } from "../../worker/mock-provider";
 import { listedModel, listKeyModels } from "../../worker/model-list";
-import { listCliModels } from "../../worker/cli-provider";
+import { cliSignedIn, listCliModels } from "../../worker/cli-provider";
 import { ProviderError } from "../../worker/providers";
 
 export type ProviderAvailability =
@@ -112,6 +112,9 @@ export async function modelAvailability(
       const own = catalogue.filter((model) => model.provider === provider);
       const cli = providerCli(provider);
       if (cli) {
+        // `codex debug models` answers signed out too, and a list then would
+        // read as the plan's.
+        if ((await cliSignedIn(cli)) === false) return [provider, { status: "cli" }];
         const listed = await listFor(provider, `cli:${cli.command}`, force, async () => {
           const ids = await listCliModels(cli);
           if (ids === null) throw new Error("NO_MODEL_LIST");

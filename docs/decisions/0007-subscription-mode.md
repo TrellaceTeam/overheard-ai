@@ -12,9 +12,12 @@ command is installed, so a copied `.env` turns the mode on for anyone who has th
 off for anyone who doesn't, with nothing to fill in. A pasted key wins, because it is an
 explicit choice and the API path is the cleaner measurement. Google has no such route yet.
 
-On the Account settings screen, the ChatGPT row lists the catalogue models Codex offers the
-signed-in account, read from `codex debug models`, which makes no model call. Claude Code has
-no such list, so its setup check's one real call is the test there.
+On the Account settings screen, each row says whether its tool is signed in, read from the
+tool's own status command (`claude auth status`, `codex login status`), which makes no model
+call and follows `CLAUDE_CONFIG_DIR` and `CODEX_HOME`. While Codex is signed in, the ChatGPT
+row lists the catalogue models it offers the account, read from `codex debug models`, which
+also makes no model call and answers signed out too. Claude Code has no such list, so its
+setup check's one real call is the test there.
 
 Everything else stays as it is: the queue, the claim caps, retries, extraction and its ladder,
 scoring and the schedule. The switch happens at the one place every provider call passes,
@@ -38,8 +41,10 @@ Calls in subscription mode are logged at $0, and the catalogue prices reach the 
 zero for those providers, so every estimate agrees with the spend the worker logs. Tokens are
 still logged. A provider in subscription mode starts at 3 calls in flight.
 
-Three failure codes are new. `CLI_SIGN_IN:<provider>` covers a command that cannot be found,
-started or signed in, and is not retried. `PLAN_LIMIT:<provider>` covers a plan at its usage
+Three failure codes are new. `CLI_SIGN_IN:<provider>` covers a command that cannot be
+started or is not signed in, and is not retried. A command that is not installed leaves its
+provider on the API path, so with no key it gets the missing-key card, the same as before
+subscription mode existed. `PLAN_LIMIT:<provider>` covers a plan at its usage
 limit, and is retried with the worker's backoff like a 429. `CLI_SETTING_REFUSED:<provider>`
 covers a tool that refuses a setting Overheard passes, because its version and Overheard's
 disagree, and is not retried, since every call passes the same settings. All three read the

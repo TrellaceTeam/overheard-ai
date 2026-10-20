@@ -7,11 +7,13 @@ import {
   type CliCall,
   claudeArgs,
   classifyCliFailure,
+  cliSignedIn,
   codexArgs,
   readClaude,
   readCodex,
   runProcess,
 } from "./cli-provider";
+import { SIGNED_IN_TOOL, standInCommand } from "./cli-test-support";
 import { EXTRACTION_SHAPE } from "./extraction";
 
 const lines = (events: unknown[]) => events.map((event) => JSON.stringify(event)).join("\n");
@@ -251,6 +253,47 @@ describe("classifyCliFailure", () => {
     );
     // The provider's own refusal quotes a status and stays a refusal.
     expect(classifyCliFailure("error: unknown option in request", 400).kind).toBe("refused");
+  });
+});
+
+describe("cliSignedIn", () => {
+  const anthropic = (source: string) => ({
+    provider: "anthropic" as const,
+    command: standInCommand(source),
+  });
+  const openai = (source: string) => ({
+    provider: "openai" as const,
+    command: standInCommand(source),
+  });
+
+  it("reads each tool's own status command as signed in", async () => {
+    expect(await cliSignedIn(anthropic(SIGNED_IN_TOOL))).toBe(true);
+    expect(await cliSignedIn(openai(SIGNED_IN_TOOL))).toBe(true);
+  });
+
+  it("reads what each tool prints signed out", async () => {
+    // Claude Code 2.1.285 with an empty CLAUDE_CONFIG_DIR, and Codex 0.163.0
+    // with an empty CODEX_HOME. Both exit 1.
+    expect(
+      await cliSignedIn(
+        anthropic(
+          `process.stdout.write(JSON.stringify({ loggedIn: false, authMethod: "none" })); process.exit(1);`,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      await cliSignedIn(openai(`process.stderr.write("Not logged in\\n"); process.exit(1);`)),
+    ).toBe(false);
+  });
+
+  it("claims neither when the status cannot be read", async () => {
+    expect(await cliSignedIn(anthropic(`process.stdout.write("usage: claude [options]");`))).toBe(
+      null,
+    );
+    expect(await cliSignedIn(openai(`process.exit(2);`))).toBe(null);
+    expect(
+      await cliSignedIn({ provider: "openai", command: "overheard-no-such-command" }),
+    ).toBeNull();
   });
 });
 

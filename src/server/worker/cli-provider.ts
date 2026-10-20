@@ -419,6 +419,47 @@ export function runProcess(
   });
 }
 
+/** Long enough for a status command, short enough not to hold the key panel. */
+const STATUS_TIMEOUT_MS = 10_000;
+
+const STATUS_ARGS: Record<CliProvider, string[]> = {
+  anthropic: ["auth", "status"],
+  openai: ["login", "status"],
+};
+
+/**
+ * Whether the tool is signed in, from its own status command, which makes no
+ * model call. `claude auth status` prints JSON with `loggedIn`, and `codex
+ * login status` prints "Logged in using ChatGPT" or "Not logged in" on stderr.
+ * Both exit 1 signed out. Null when the answer cannot be read, so a version
+ * whose status command changed is never shown as signed out. It runs with a
+ * call's environment, so CLAUDE_CONFIG_DIR and CODEX_HOME pick the same
+ * account a call uses. Only the yes or no leaves this function: Claude Code's
+ * status also prints the account's email.
+ */
+export async function cliSignedIn(target: CliTarget): Promise<boolean | null> {
+  const lookup = lookupLaunch(target.command);
+  if (!lookup.found) return null;
+  const exit = await runProcess(lookup.launch, STATUS_ARGS[target.provider], {
+    cwd: tmpdir(),
+    env: cliEnv(target.provider, false),
+    stdin: "",
+    timeoutMs: STATUS_TIMEOUT_MS,
+  });
+  if (exit.timedOut || exit.startError !== null) return null;
+  const text = `${exit.stdout}\n${exit.stderr}`;
+  if (target.provider === "anthropic") {
+    try {
+      const status = JSON.parse(exit.stdout) as { loggedIn?: unknown };
+      if (typeof status.loggedIn === "boolean") return status.loggedIn;
+    } catch {
+      // Not the JSON this version prints, so fall through to its wording.
+    }
+  }
+  if (/not logged in/i.test(text)) return false;
+  return target.provider === "openai" && /\blogged in\b/i.test(text) ? true : null;
+}
+
 /** Long enough for Codex to read its catalogue, short enough not to hold the key panel. */
 const LIST_TIMEOUT_MS = 15_000;
 

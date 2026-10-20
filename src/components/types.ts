@@ -197,6 +197,12 @@ export type KeyStatus = {
    * keys at all.
    */
   source: "env" | "mock" | "cli" | "none";
+  /**
+   * For a "cli" row, whether the tool is signed in, read from its own status
+   * command. Null or absent when that could not be read, which the row shows
+   * as it did before the status was read.
+   */
+  signedIn?: boolean | null | undefined;
   result: SetupCheckState;
 };
 

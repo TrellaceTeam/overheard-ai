@@ -4,6 +4,7 @@ import { freshDb } from "../../logic/test-support";
 import { stopWorker } from "../../worker/loop";
 import { stopScheduler } from "../../worker/scheduler-loop";
 import { INFLIGHT_CAP_ENV } from "../../worker/concurrency";
+import { SIGNED_IN_TOOL, SIGNED_OUT_TOOL, standInCommand } from "../../worker/cli-test-support";
 import {
   callLimit,
   databaseInfo,
@@ -43,9 +44,14 @@ afterEach(() => {
 });
 
 describe("providerKeyStatus", () => {
-  it("reports booleans and never a value", () => {
+  afterEach(() => {
+    delete process.env["OVERHEARD_ANTHROPIC_CLI"];
+    delete process.env["OVERHEARD_OPENAI_CLI"];
+  });
+
+  it("reports booleans and never a value", async () => {
     process.env["OPENAI_API_KEY"] = "sk-not-a-real-key";
-    const status = providerKeyStatus();
+    const status = await providerKeyStatus();
 
     expect(status).toEqual([
       { provider: "openai", configured: true, source: "env", problem: null },
@@ -55,14 +61,30 @@ describe("providerKeyStatus", () => {
     expect(JSON.stringify(status)).not.toContain("sk-");
   });
 
-  it("accepts GEMINI_API_KEY as the Google alias", () => {
+  it("accepts GEMINI_API_KEY as the Google alias", async () => {
     process.env["GEMINI_API_KEY"] = "a-google-key";
-    const configured = providerKeyStatus().filter((row) => row.configured);
+    const configured = (await providerKeyStatus()).filter((row) => row.configured);
     expect(configured.map((row) => row.provider)).toEqual(["google"]);
   });
 
-  it("reports nothing configured when the environment is empty", () => {
-    expect(providerKeyStatus().some((row) => row.configured)).toBe(false);
+  it("reports nothing configured when the environment is empty", async () => {
+    expect((await providerKeyStatus()).some((row) => row.configured)).toBe(false);
+  });
+
+  it("says whether each plan's tool is signed in, from its status command alone", async () => {
+    process.env["OVERHEARD_ANTHROPIC_CLI"] = standInCommand(SIGNED_IN_TOOL);
+    process.env["OVERHEARD_OPENAI_CLI"] = standInCommand(SIGNED_OUT_TOOL);
+    const rows = await providerKeyStatus();
+    expect(rows.find((row) => row.provider === "anthropic")).toMatchObject({
+      source: "cli",
+      signedIn: true,
+    });
+    expect(rows.find((row) => row.provider === "openai")).toMatchObject({
+      source: "cli",
+      signedIn: false,
+    });
+    // Claude Code's status names the account, and none of it leaves the server.
+    expect(JSON.stringify(rows)).not.toContain("authMethod");
   });
 });
 

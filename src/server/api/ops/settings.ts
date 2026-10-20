@@ -16,7 +16,8 @@ import type { Provider } from "../../db/types";
 import { effectiveCallLimit } from "../../logic/plan-run";
 import { CALL_LIMIT_MAX, CALL_LIMIT_MIN, DEFAULT_MAX_PLANNED_CALLS } from "../../logic/types";
 import { defaultCap, effectiveCaps, envCap, INFLIGHT_CAP_ENV } from "../../worker/concurrency";
-import { keyStatus, type ProviderKeyStatus } from "../../worker/keys";
+import { cliSignedIn } from "../../worker/cli-provider";
+import { keyStatus, providerCli, type ProviderKeyStatus } from "../../worker/keys";
 import { mockProvidersEnabled } from "../../worker/mock-provider";
 import { workerStatus, type StartWorkerOptions } from "../../worker/loop";
 import { getStoredCaps } from "../../worker/queries";
@@ -26,9 +27,18 @@ import { INFLIGHT_CAP_MAX, INFLIGHT_CAP_MIN, isInflightCap } from "@/lib/infligh
 
 export type { ProviderKeyStatus, StartWorkerOptions };
 
-/** Which providers have a key, as booleans. Never a value. */
-export function providerKeyStatus(): ProviderKeyStatus[] {
-  return keyStatus();
+/**
+ * Which providers have a key, and whether each subscription-mode tool is
+ * signed in, as booleans. Never a value. The status is read on every call, as
+ * a key is, so signing in while the app runs shows on the next read.
+ */
+export async function providerKeyStatus(): Promise<ProviderKeyStatus[]> {
+  return Promise.all(
+    keyStatus().map(async (row) => {
+      const cli = row.source === "cli" ? providerCli(row.provider) : null;
+      return cli ? { ...row, signedIn: await cliSignedIn(cli) } : row;
+    }),
+  );
 }
 
 export interface DatabaseInfo {

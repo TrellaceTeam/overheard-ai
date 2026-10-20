@@ -171,6 +171,12 @@ export interface ProviderKeyStatus {
    * Never a key value.
    */
   problem: string | null;
+  /**
+   * For a "cli" row, whether the tool is signed in, or null when its status
+   * could not be read. The settings op adds it (cliSignedIn), because reading
+   * it starts the tool and keyStatus stays a file stat or two.
+   */
+  signedIn?: boolean | null;
 }
 
 /**

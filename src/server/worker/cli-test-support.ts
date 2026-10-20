@@ -8,8 +8,20 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/** Prints what a signed-out Claude Code prints, and fails. */
+/**
+ * Prints what a signed-out Claude Code prints, and fails. Its "Not logged in"
+ * also reads as signed out to the status commands.
+ */
 export const SIGNED_OUT_TOOL = `process.stdout.write(JSON.stringify({ type: "result", is_error: true, result: "Not logged in · Please run /login" }) + "\\n");
+process.exit(1);`;
+
+/**
+ * Answers both tools' status commands signed in, the way Claude Code 2.1.285
+ * and Codex 0.163.0 do, and fails anything else.
+ */
+export const SIGNED_IN_TOOL = `const args = process.argv.slice(2).join(" ");
+if (args === "auth status") { process.stdout.write(JSON.stringify({ loggedIn: true, authMethod: "claude.ai" }) + "\\n"); process.exit(0); }
+if (args === "login status") { process.stderr.write("Logged in using ChatGPT\\n"); process.exit(0); }
 process.exit(1);`;
 
 /** The full path of a new stand-in command that runs `source`. */
