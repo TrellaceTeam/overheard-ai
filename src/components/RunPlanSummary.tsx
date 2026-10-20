@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import type { RunPlan } from "@/components/types";
 import { DEFAULT_MAX_PLANNED_CALLS } from "@/lib/call-limits";
 import { money } from "@/lib/money";
+import { keysPhrase, planCallsPhrase, plansPhrase, type RunSpend } from "@/lib/plan-spend";
 
 /**
  * The planner's ceiling when a caller does not pass the live one: the shared
@@ -15,12 +16,43 @@ export const MAX_PLANNED_CALLS = DEFAULT_MAX_PLANNED_CALLS;
 /**
  * The plan a Run now confirmation shows: the planner's counts, plus the shared
  * estimate once it has resolved. A null estimate (still loading, or a screen
- * that cannot price the run) drops the dollar line instead of showing a stale
+ * that cannot price the run) drops the money line instead of showing a stale
  * or zero figure. Both Run now dialogs build their summary this way, so the
  * confirmation and the Runner line beside it agree about the money.
  */
-export function planWithEstimate(plan: RunPlan, estimate: number | null | undefined): RunPlan {
-  return { ...plan, estimateUsd: estimate ?? undefined };
+export function planWithEstimate(plan: RunPlan, spend: RunSpend | null | undefined): RunPlan {
+  return { ...plan, spend: spend ?? undefined };
+}
+
+/** Who pays for the calls, after the sentence that counts them. */
+function payerSentence(spend: RunSpend | undefined): string {
+  if (spend?.kind === "plans") {
+    return "They count against your plan's usage limits instead of a bill.";
+  }
+  if (spend?.kind === "mixed") {
+    return "Key calls bill your provider. Plan calls count against the plan's usage limits.";
+  }
+  return "You pay the provider directly.";
+}
+
+function MoneySentence({ spend }: { spend: RunSpend }) {
+  if (spend.kind === "plans") {
+    return (
+      <p className="num text-sm">
+        This run costs <span className="font-semibold">$0</span>. Its calls count against{" "}
+        {plansPhrase(spend.plans)}.
+      </p>
+    );
+  }
+  return (
+    <p className="num text-sm">
+      This run will cost about <span className="font-semibold">{money(spend.usd)}</span>{" "}
+      {spend.kind === "mixed"
+        ? `on ${keysPhrase(spend.keys)}, at list prices, plus ${planCallsPhrase(spend.planCalls)}.`
+        : "on your own keys, at list prices."}{" "}
+      Every answer's real cost is logged as it lands.
+    </p>
+  );
 }
 
 /**
@@ -55,14 +87,9 @@ export function RunPlanSummary({
       </p>
       <p className="num text-xs text-muted-foreground">
         {noun(plan.calls, "provider call", "provider calls")}: one to ask each prompt and one to
-        read the answer back. You pay the provider directly.
+        read the answer back. {payerSentence(plan.spend)}
       </p>
-      {plan.estimateUsd !== undefined && (
-        <p className="num text-sm">
-          This run will cost about <span className="font-semibold">{money(plan.estimateUsd)}</span>{" "}
-          on your own keys, at list prices. Every answer's real cost is logged as it lands.
-        </p>
-      )}
+      {plan.spend !== undefined && <MoneySentence spend={plan.spend} />}
       {perceptionCalls > 0 && (
         <p className="num text-xs text-muted-foreground">
           Plus {noun(perceptionCalls, "call", "calls")} to ask each assistant what it already knows

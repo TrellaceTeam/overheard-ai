@@ -18,6 +18,7 @@ import { CountingInfo } from "@/components/CountingInfo";
 import { DeleteRunButton } from "@/components/DeleteRunButton";
 import { DemoReadOnlyNote, DEMO_READONLY_REASON } from "@/components/DemoReadOnlyNote";
 import { useIsDemo } from "@/components/useIsDemo";
+import { usePlanProviders } from "@/components/usePlanProviders";
 import { MetricGrid } from "@/components/MetricGrid";
 import { PromptSummaryCard } from "@/components/PromptSummaryCard";
 import { TOUR_SELECTORS } from "@/components/TutorialTour";
@@ -197,6 +198,10 @@ function RunDetail() {
     queryFn: () => listBrands({ data: { projectId } }),
   });
   const target = (brands ?? []).find((b) => b.role === "target");
+  // Present-tense calls (a retry, a summary) go the way this install sends
+  // them now. A past run's spend has no stored route, so its line only adds
+  // what a plan call logs.
+  const { planProviders, payer } = usePlanProviders();
 
   const allTasks = useMemo(() => detail?.tasks ?? [], [detail]);
   const observations = useMemo(() => detail?.observations ?? [], [detail]);
@@ -396,6 +401,8 @@ function RunDetail() {
         <p className="num type-meta">
           Estimated spend on your own keys: {money(detail?.estimatedCostUsd ?? 0)}. List rates, not
           an invoice.
+          {planProviders.size > 0 &&
+            " Calls on a Claude or ChatGPT plan log $0 and count against the plan's usage limits instead."}
         </p>
         <div className="flex items-center gap-2">
           {active && (
@@ -443,6 +450,7 @@ function RunDetail() {
         onRetry={() => void retry()}
         retrying={retrying}
         locked={demoReason}
+        payer={payer}
       />
 
       {finished && !perceptionOnly && (
@@ -528,9 +536,9 @@ function RunDetail() {
             <section className="space-y-3">
               <h3 className="type-section">What the answers say</h3>
               <p className="type-meta max-w-prose">
-                One summary per prompt, written on demand by your extraction model on your own keys,
-                at the rough cost on the button. Summaries are prose for a reader and never count in
-                the statistics above.
+                One summary per prompt, written on demand by your extraction model {payer}, at the
+                rough cost on the button. Summaries are prose for a reader and never count in the
+                statistics above.
               </p>
               {(detail?.promptSummaries ?? []).map((row) => (
                 <PromptSummaryCard

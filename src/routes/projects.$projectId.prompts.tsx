@@ -6,6 +6,7 @@ import { Archive, Plus, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DemoReadOnlyNote, DEMO_READONLY_REASON } from "@/components/DemoReadOnlyNote";
 import { useIsDemo } from "@/components/useIsDemo";
+import { usePlanProviders } from "@/components/usePlanProviders";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,6 +181,7 @@ function Prompts() {
     () => new Map((resultsSummaries.data ?? []).map((row) => [row.promptId, row])),
     [resultsSummaries.data],
   );
+  const { payer } = usePlanProviders();
   const [summarizing, setSummarizing] = useState<string | null>(null);
 
   const counts = answerCounts.data ?? {};
@@ -299,6 +301,7 @@ function Prompts() {
         row={row}
         busy={summarizing === promptId}
         locked={isDemo ? DEMO_READONLY_REASON : null}
+        payer={payer}
         onAsk={() => void summarize(promptId)}
       />
     );

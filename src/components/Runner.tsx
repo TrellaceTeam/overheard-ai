@@ -21,6 +21,7 @@ import { orderAssistants } from "@/lib/dashboard-filters";
 import { toAnswers } from "@/lib/run-progress";
 import { errorText } from "@/lib/error-text";
 import { money } from "@/lib/money";
+import { keysPhrase, planCallsPhrase, plansPhrase, type RunSpend } from "@/lib/plan-spend";
 import { listModels, listProjectModels, setProjectModel } from "@/server/api/models";
 import { createRun, kickWorker, planRun } from "@/server/api/runs";
 import { callLimit as fetchCallLimit, keyStatus as fetchKeyStatus } from "@/server/api/settings";
@@ -102,6 +103,23 @@ export function planLine(input: {
   return `${factors} = ${noun(answers, "answer", "answers")}`;
 }
 
+/**
+ * The plan line's money: list prices on keys, nothing but a count on plans,
+ * and the key dollars plus the plan calls when a run uses both.
+ */
+function SpendTail({ spend }: { spend: RunSpend }) {
+  if (spend.kind === "plans") return <>{` · $0, they count against ${plansPhrase(spend.plans)}`}</>;
+  return (
+    <>
+      {" · about "}
+      <span className="font-semibold">{money(spend.usd)}</span>
+      {spend.kind === "mixed"
+        ? ` on ${keysPhrase(spend.keys)}, plus ${planCallsPhrase(spend.planCalls)}`
+        : " at list prices"}
+    </>
+  );
+}
+
 /** The prompts the plan line counts, as the library already holds them. */
 export interface RunnerPrompt {
   id: string;
@@ -177,7 +195,7 @@ export function Runner({
 
   // The estimate the confirmation dialog shows too, so the line and the
   // dialog cannot disagree.
-  const estimate = useRunEstimate({ projectId, prompts, plan: plan.data });
+  const spend = useRunEstimate({ projectId, prompts, plan: plan.data });
 
   async function toggle(modelId: string, on: boolean) {
     try {
@@ -251,12 +269,7 @@ export function Runner({
                 })}
                 {" · "}
                 <span className="num">{plan.data.calls} provider calls</span>
-                {estimate !== null && (
-                  <>
-                    {" · about "}
-                    <span className="font-semibold">{money(estimate)}</span> at list prices
-                  </>
-                )}
+                {spend !== null && <SpendTail spend={spend} />}
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">Working out what this run needs…</p>
@@ -287,7 +300,7 @@ export function Runner({
             </p>
           ) : plan.data ? (
             <RunPlanSummary
-              plan={planWithEstimate(plan.data, estimate)}
+              plan={planWithEstimate(plan.data, spend)}
               maxCalls={limits.data?.limit}
             />
           ) : (

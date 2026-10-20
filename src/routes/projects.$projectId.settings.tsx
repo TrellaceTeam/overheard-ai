@@ -28,14 +28,16 @@ import { DemoReadOnlyNote } from "@/components/DemoReadOnlyNote";
 import { BadgeInput } from "@/components/BadgeInput";
 import { ScheduleCard, detectTimezone } from "@/components/ScheduleCard";
 import { useIsDemo } from "@/components/useIsDemo";
+import { usePlanProviders } from "@/components/usePlanProviders";
 import type { Schedule, ScheduleDraft } from "@/components/types";
+import { payerPhrase } from "@/lib/plan-spend";
 import { keyEnvNamesSafe } from "@/lib/provider-keys";
 import { errorText } from "@/lib/error-text";
 import { BRAND_TOKEN, perceptionEnabled, resolvePerceptionPrompt } from "@/lib/perception";
 import { isPlausibleDomain, normalizeDomain } from "@/lib/brand-matching";
 import { afterDeleteDestination } from "@/lib/launch";
 import { getTargetBrand, recomputeCitations, updateBrand } from "@/server/api/brands";
-import { listExtractionModels } from "@/server/api/models";
+import { listExtractionModels, listProjectModels } from "@/server/api/models";
 import { getPerceptionState } from "@/server/api/perception";
 import {
   deleteProject,
@@ -373,6 +375,16 @@ function PerceptionSection({ projectId }: { projectId: string }) {
     queryKey: ["target-brand", projectId],
     queryFn: () => getTargetBrand({ data: { projectId } }),
   });
+  // Saving asks the project's assistants, so they decide who pays.
+  const assistants = useQuery({
+    queryKey: ["project-models", projectId],
+    queryFn: () => listProjectModels({ data: { projectId } }),
+  });
+  const { planProviders } = usePlanProviders();
+  const payer = payerPhrase(
+    (assistants.data ?? []).map((row) => row.provider),
+    planProviders,
+  );
 
   const saved = state.data?.prompt ?? "";
   const text = draft ?? saved;
@@ -452,7 +464,7 @@ function PerceptionSection({ projectId }: { projectId: string }) {
           </Button>
           {dirty && (
             <p className="text-xs text-muted-foreground">
-              Saving asks each assistant the new prompt once, on your own keys.
+              Saving asks each assistant the new prompt once, {payer}.
             </p>
           )}
         </div>

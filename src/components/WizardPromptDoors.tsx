@@ -6,7 +6,7 @@ import {
   type GenerateState,
   generateButtonLabel,
   NO_KEY_HINT,
-  THREE_DOORS_LINE,
+  threeDoorsLine,
 } from "@/lib/starter-generation";
 
 /**
@@ -15,17 +15,27 @@ import {
  *
  * The button is null in the tutorial, which never shows it: the tour rings
  * the line alone. The rough cost is on the button before any spend, because
- * the call goes to the user's own key. The route owns the server call, the
- * busy state and the toast.
+ * the call goes to the user's own key, or the plan it counts against when it
+ * goes through one. The route owns the server call, the busy state and the
+ * toast.
  */
 export function WizardPromptDoors({
   button,
+  payer,
 }: {
-  button: { state: GenerateState; costUsd: number; onGenerate: () => void } | null;
+  button: {
+    state: GenerateState;
+    costUsd: number;
+    /** The plan the call counts against, or null on a key. */
+    plan?: string | null | undefined;
+    onGenerate: () => void;
+  } | null;
+  /** Who pays for the generating call (lib/plan-spend). */
+  payer?: string | undefined;
 }) {
   return (
     <div className="space-y-3" data-tour={TOUR_SELECTORS.wizardDoors}>
-      <p className="type-meta">{THREE_DOORS_LINE}</p>
+      <p className="type-meta">{threeDoorsLine(payer)}</p>
       {button && (
         <div className="space-y-2">
           <Button
@@ -43,7 +53,7 @@ export function WizardPromptDoors({
             ) : (
               <Sparkles className="mr-2 size-3.5" />
             )}
-            {generateButtonLabel(button.state, button.costUsd)}
+            {generateButtonLabel(button.state, button.costUsd, button.plan ?? null)}
           </Button>
           {button.state === "no-key" && <p className="type-meta">{NO_KEY_HINT}</p>}
         </div>

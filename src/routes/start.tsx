@@ -13,6 +13,7 @@ import { RunPlanSummary } from "@/components/RunPlanSummary";
 import { TOUR_SELECTORS, useTour } from "@/components/TutorialTour";
 import { Button } from "@/components/ui/button";
 import { useModelAvailability } from "@/components/useModelAvailability";
+import { usePlanProviders } from "@/components/usePlanProviders";
 import { useProviderChecks } from "@/components/useProviderChecks";
 import { useSelectionCheck } from "@/components/useSelectionCheck";
 import { EMPTY_WIZARD_DRAFT, useWizardForm } from "@/components/useWizardForm";
@@ -26,6 +27,7 @@ import { orderAssistants } from "@/lib/dashboard-filters";
 import { errorText } from "@/lib/error-text";
 import { isTutorialMode } from "@/lib/launch";
 import { createGate, estimateWizardSpend, pickExtractor } from "@/lib/onboarding";
+import { callsByProvider, payerPhrase, planOf, runSpend } from "@/lib/plan-spend";
 import { modelPrices } from "@/lib/run-estimate";
 import { newProjectPlan } from "@/lib/run-plan";
 import { toAnswers } from "@/lib/run-progress";
@@ -302,21 +304,38 @@ function Start() {
   const { writtenPrompts } = form;
   const plan = newProjectPlan(writtenPrompts, selectedModelIds.length);
 
-  // Dollars at list prices, from the same totals as the call count. Labelled an
-  // estimate wherever it is shown: the run screen logs real spend as it lands.
-  const spendEstimate = useMemo(() => {
+  // Dollars at list prices, from the same totals as the call count, split by
+  // who pays. Labelled an estimate wherever it is shown: the run screen logs
+  // real spend as it lands.
+  const { planProviders } = usePlanProviders();
+  const spend = useMemo(() => {
     const catalogue = models.data ?? [];
-    const extractor = pickExtractor(extractionModels.data ?? [], keyedProviders);
-    return estimateWizardSpend({
-      totalIterations: writtenPrompts.reduce((sum, prompt) => sum + prompt.iterations, 0),
-      assistants: selectedModelIds
-        .map((id) => catalogue.find((model) => model.id === id))
-        .filter((model): model is CatalogModel => model !== undefined)
-        .map(modelPrices),
+    const extractor = pickExtractor(extractionModels.data ?? [], keyedProviders) ?? null;
+    const totalIterations = writtenPrompts.reduce((sum, prompt) => sum + prompt.iterations, 0);
+    const assistants = selectedModelIds
+      .map((id) => catalogue.find((model) => model.id === id))
+      .filter((model): model is CatalogModel => model !== undefined);
+    const usd = estimateWizardSpend({
+      totalIterations,
+      assistants: assistants.map(modelPrices),
       extractor: extractor ? modelPrices(extractor) : null,
       includePerception: true,
     });
-  }, [models.data, extractionModels.data, keyedProviders, writtenPrompts, selectedModelIds]);
+    const calls = callsByProvider({
+      totalIterations,
+      assistants,
+      extractor,
+      includePerception: true,
+    });
+    return runSpend(usd, calls, planProviders);
+  }, [
+    models.data,
+    extractionModels.data,
+    keyedProviders,
+    writtenPrompts,
+    selectedModelIds,
+    planProviders,
+  ]);
 
   // The model the generate button's call goes to, by the same rule and from
   // the same two lists the server picks from, so the rough cost on the button
@@ -562,11 +581,18 @@ function Start() {
               <div className="space-y-4">
                 <WizardPromptList form={form} locked={isTutorial} busy={generating} />
                 <WizardPromptDoors
+                  payer={payerPhrase(
+                    generationModel ? [generationModel.provider] : [],
+                    planProviders,
+                  )}
                   button={
                     !isTutorial && generateReady
                       ? {
                           state: generation,
                           costUsd: generationCost,
+                          plan: generationModel
+                            ? planOf(generationModel.provider, planProviders)
+                            : null,
                           onGenerate: () => void generatePrompts(),
                         }
                       : null
@@ -585,10 +611,7 @@ function Start() {
               </fieldset>
 
               {!isTutorial && selectedModelIds.length > 0 && writtenPrompts.length > 0 && (
-                <RunPlanSummary
-                  plan={{ ...plan, estimateUsd: spendEstimate }}
-                  maxCalls={limits.data?.limit}
-                />
+                <RunPlanSummary plan={{ ...plan, spend }} maxCalls={limits.data?.limit} />
               )}
 
               <div className="space-y-3">

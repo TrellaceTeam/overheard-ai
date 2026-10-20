@@ -21,6 +21,9 @@ const runnerMocks = vi.hoisted(() => ({
     perceptionSkipped: null,
   })),
   kickWorker: vi.fn(async () => ({ ok: true as const })),
+  keys: {
+    value: [] as Array<{ provider: string; configured: boolean; source: string }>,
+  },
   plan: {
     value: { prompts: 3, assistants: 2, answers: 30, calls: 60, perceptionCalls: 0 } as
       | {
@@ -106,12 +109,15 @@ vi.mock("@/server/api/runs", () => ({
   createRun: runnerMocks.createRun,
   kickWorker: runnerMocks.kickWorker,
 }));
+/** Both providers on a key, which the tests that do not name a plan run with. */
+const KEYS_ONLY = [
+  { provider: "anthropic", configured: true, source: "env" },
+  { provider: "openai", configured: true, source: "env" },
+  { provider: "google", configured: false, source: "none" },
+];
+
 vi.mock("@/server/api/settings", () => ({
-  keyStatus: async () => [
-    { provider: "anthropic", configured: true, source: "env" },
-    { provider: "openai", configured: true, source: "env" },
-    { provider: "google", configured: false, source: "none" },
-  ],
+  keyStatus: async () => runnerMocks.keys.value,
   callLimit: async () => ({ limit: 1000 }),
   modelAvailability: async () => ({
     anthropic: { status: "ok", available: ["claude-mid"], missing: [] },
@@ -237,6 +243,7 @@ describe("Runner", () => {
     runnerMocks.navigate.mockClear();
     runnerMocks.setProjectModel.mockClear();
     runnerMocks.createRun.mockClear();
+    runnerMocks.keys.value = KEYS_ONLY;
     runnerMocks.plan.value = {
       prompts: 3,
       assistants: 2,
@@ -287,6 +294,38 @@ describe("Runner", () => {
     fireEvent.click(run);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog.textContent).toMatch(/This run will cost about \$3\.67/));
+  });
+
+  it("says calls on plans count against them, with no list price", async () => {
+    runnerMocks.keys.value = [
+      { provider: "anthropic", configured: true, source: "cli" },
+      { provider: "openai", configured: true, source: "cli" },
+      { provider: "google", configured: false, source: "none" },
+    ];
+    const { container } = renderRunner();
+    await waitFor(() =>
+      expect(container.textContent).toContain(
+        "60 provider calls · $0, they count against your Claude and ChatGPT plans",
+      ),
+    );
+    expect(container.textContent).not.toMatch(/at list prices/);
+  });
+
+  it("splits a mixed run into the key dollars and the plan calls", async () => {
+    // Claude through Claude Code, GPT on a key. The mocked prices are not
+    // zeroed the way the server zeroes a plan's, so this pins the wording, not
+    // the dollars.
+    runnerMocks.keys.value = [
+      { provider: "anthropic", configured: true, source: "cli" },
+      { provider: "openai", configured: true, source: "env" },
+      { provider: "google", configured: false, source: "none" },
+    ];
+    const { container } = renderRunner();
+    await waitFor(() =>
+      expect(container.textContent).toMatch(
+        /· about \$\d+\.\d{2} on your OpenAI key, plus 45 calls on your Claude plan/,
+      ),
+    );
   });
 
   it("shows the planner's refusal as a sentence and refuses to launch", async () => {

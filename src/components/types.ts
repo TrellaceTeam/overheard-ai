@@ -10,6 +10,7 @@
  * view model that depended on it would drag a database driver into the bundle.
  */
 import type { Agg } from "@/lib/metrics";
+import type { RunSpend } from "@/lib/plan-spend";
 import type { RunPlanCounts } from "@/lib/run-plan";
 import type { SearchCheckStatus } from "@/lib/setup-check";
 import type { StoredFailure } from "@/lib/failure-codes";
@@ -211,12 +212,12 @@ export type RunPlan = RunPlanCounts & {
    */
   perceptionCalls?: number | undefined;
   /**
-   * What the run will cost in USD at catalogue list prices, when the caller
-   * can compute one (the wizard and both Run now dialogs do). Absent means no
-   * dollar line is shown. Always an estimate: the run screen logs real spend
-   * per answer as it lands.
+   * What the run will cost in USD at catalogue list prices, and who pays, when
+   * the caller can compute it (the wizard and both Run now dialogs do). Absent
+   * means no money line is shown. Always an estimate: the run screen logs real
+   * spend per answer as it lands.
    */
-  estimateUsd?: number | undefined;
+  spend?: RunSpend | undefined;
 };
 
 /**

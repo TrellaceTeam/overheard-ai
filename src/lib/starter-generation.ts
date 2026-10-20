@@ -274,10 +274,12 @@ export function estimateGenerationCost(
 /**
  * The line under the prompt library that names the three doors. It says
  * "these prompts", not a count: the tutorial's list has four, and a user can
- * add or remove rows before reading it.
+ * add or remove rows before reading it. `payer` says who pays for the
+ * generating call (lib/plan-spend).
  */
-export const THREE_DOORS_LINE =
-  "These prompts are a starting point. Keep them, edit them by hand, or generate a set tailored to your brand on your own keys.";
+export function threeDoorsLine(payer = "on your own keys"): string {
+  return `These prompts are a starting point. Keep them, edit them by hand, or generate a set tailored to your brand ${payer}.`;
+}
 
 /** Under the button when there is no key to call a model with. */
 export const NO_KEY_HINT = "Needs a provider key. Add one in Account settings.";
@@ -311,8 +313,16 @@ export function generateState(input: {
   return "edited";
 }
 
-/** What the button reads in each state. The rough cost carries no model name. */
-export function generateButtonLabel(state: GenerateState, costUsd: number): string {
+/**
+ * What the button reads in each state. The rough cost carries no model name.
+ * `plan` names the plan the call counts against when it goes through one, and
+ * then there is no cost to show.
+ */
+export function generateButtonLabel(
+  state: GenerateState,
+  costUsd: number,
+  plan: string | null = null,
+): string {
   switch (state) {
     case "generating":
       return "Generating…";
@@ -322,7 +332,9 @@ export function generateButtonLabel(state: GenerateState, costUsd: number): stri
       return "Generate custom prompts";
     case "armed":
     case "edited":
-      return `Generate custom prompts ~ ${money(costUsd)} on your key`;
+      return plan
+        ? `Generate custom prompts on your ${plan} plan`
+        : `Generate custom prompts ~ ${money(costUsd)} on your key`;
   }
 }
 

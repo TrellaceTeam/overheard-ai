@@ -53,6 +53,10 @@ const mocks = vi.hoisted(() => ({
     extractionPrompt: "read",
     extractionPromptDefault: "read",
   })),
+  keyStatus: vi.fn(async () => [
+    { provider: "anthropic", configured: true, source: "env" },
+    { provider: "openai", configured: true, source: "env" },
+  ]),
 }));
 
 vi.mock("@/server/api/models", () => ({
@@ -63,6 +67,7 @@ vi.mock("@/server/api/models", () => ({
 vi.mock("@/server/api/projects", () => ({
   getProjectSettings: mocks.getProjectSettings,
 }));
+vi.mock("@/server/api/settings", () => ({ keyStatus: mocks.keyStatus }));
 
 import { useRunEstimate, type EstimatePrompt } from "./useRunEstimate";
 
@@ -102,7 +107,25 @@ describe("useRunEstimate", () => {
     // line rounds to $3.67.
     const { result } = renderEstimate(PLAN, PROMPTS);
     await waitFor(() => expect(result.current).not.toBeNull());
-    expect(result.current).toBeCloseTo(3.675, 3);
+    expect(result.current?.kind).toBe("keys");
+    expect(result.current?.kind === "keys" && result.current.usd).toBeCloseTo(3.675, 3);
+  });
+
+  it("splits the calls by who pays once a provider is on a plan", async () => {
+    // Anthropic through Claude Code, as the key panel reports it.
+    mocks.keyStatus.mockResolvedValueOnce([
+      { provider: "anthropic", configured: true, source: "cli" },
+      { provider: "openai", configured: true, source: "env" },
+    ]);
+    const { result } = renderEstimate(PLAN, PROMPTS);
+    await waitFor(() => expect(result.current).not.toBeNull());
+    // 15 answers on Claude Mid, 15 on GPT Mid, and the Haiku extractor reads
+    // all 30, so 45 of the 60 calls go through the Claude plan.
+    expect(result.current).toMatchObject({
+      kind: "mixed",
+      keys: ["OpenAI"],
+      planCalls: [{ plan: "Claude", calls: 45 }],
+    });
   });
 
   it("holds back while an input is missing, rather than pricing without it", async () => {
@@ -116,8 +139,10 @@ describe("useRunEstimate", () => {
     await waitFor(() => expect(withoutPerception.result.current).not.toBeNull());
     const withPerception = renderEstimate({ ...PLAN, perceptionCalls: 6 }, PROMPTS);
     await waitFor(() => expect(withPerception.result.current).not.toBeNull());
-    expect(withPerception.result.current ?? 0).toBeGreaterThan(
-      withoutPerception.result.current ?? 0,
+    const usd = (spend: typeof withPerception.result.current) =>
+      spend?.kind === "keys" ? spend.usd : 0;
+    expect(usd(withPerception.result.current)).toBeGreaterThan(
+      usd(withoutPerception.result.current),
     );
   });
 });
