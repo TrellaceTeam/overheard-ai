@@ -172,7 +172,9 @@ describe("KeyStatusList", () => {
         modelNames={new Map([["alpha", "Assistant Alpha"]])}
       />,
     );
-    expect(screen.getByText(/Claude Code is installed but not signed in\. Run/)).toBeDefined();
+    expect(
+      screen.getByText(/Claude Code is installed but not signed in with your Claude plan\. Run/),
+    ).toBeDefined();
     expect(screen.getByText("claude auth login")).toBeDefined();
     expect(screen.queryByText("via claude, on your Claude plan")).toBeNull();
     expect(screen.queryByRole("button", { name: "Check" })).toBeNull();

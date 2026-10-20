@@ -85,10 +85,10 @@ export function KeyStatusList({
           {signedOut(status) && isCliProvider(status.provider) ? (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <X className="size-3.5" />
-              {PROVIDER_CLI[status.provider].tool} is installed but not signed in. Run{" "}
+              {PROVIDER_CLI[status.provider].tool} is installed but not signed in with your{" "}
+              {PROVIDER_CLI[status.provider].plan} plan. Run{" "}
               <code className="num text-foreground">{PROVIDER_CLI[status.provider].signIn}</code> in
-              a terminal and sign in with your {PROVIDER_CLI[status.provider].plan} plan, then check
-              again.
+              a terminal and sign in with that plan, then check again.
             </span>
           ) : status.configured ? (
             <span className="inline-flex items-center gap-1 text-xs text-primary">

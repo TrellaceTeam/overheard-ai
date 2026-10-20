@@ -299,29 +299,52 @@ describe("cliSignedIn", () => {
     ).toBeNull();
   });
 
-  it("does not count Codex signed in another way as on a plan, since that bills a key", async () => {
+  it("reads Codex signed in another way as not on a plan, since that bills a key", async () => {
     for (const line of [
       "Logged in using an API key",
+      "API key configured",
       "Logged in using access token",
       "Logged in using Amazon Bedrock API key",
     ]) {
       expect(
         await cliSignedIn(openai(`process.stderr.write(${JSON.stringify(`${line}\n`)});`)),
         line,
-      ).toBeNull();
+      ).toBe(false);
     }
   });
 
   it("asks the account CLAUDE_CONFIG_DIR points at, as a call does", async () => {
+    const before = process.env["CLAUDE_CONFIG_DIR"];
+    delete process.env["CLAUDE_CONFIG_DIR"];
     const tool = anthropic(
       `process.stdout.write(JSON.stringify({ loggedIn: process.env.CLAUDE_CONFIG_DIR === "second-account" }));`,
     );
-    expect(await cliSignedIn(tool)).toBe(false);
-    process.env["CLAUDE_CONFIG_DIR"] = "second-account";
     try {
+      expect(await cliSignedIn(tool)).toBe(false);
+      process.env["CLAUDE_CONFIG_DIR"] = "second-account";
       expect(await cliSignedIn(tool)).toBe(true);
     } finally {
-      delete process.env["CLAUDE_CONFIG_DIR"];
+      if (before === undefined) delete process.env["CLAUDE_CONFIG_DIR"];
+      else process.env["CLAUDE_CONFIG_DIR"] = before;
+    }
+  });
+
+  it("shares a read that is still running, however long it takes", async () => {
+    const count = join(mkdtempSync(join(tmpdir(), "overheard-count-")), "count");
+    writeFileSync(count, "");
+    const slow = anthropic(
+      `require("node:fs").appendFileSync(${JSON.stringify(count)}, "x"); setTimeout(() => process.stdout.write(JSON.stringify({ loggedIn: true })), 300);`,
+    );
+    const now = vi.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(3_000_000);
+      const first = cliSignedIn(slow);
+      now.mockReturnValue(3_005_000);
+      const second = cliSignedIn(slow);
+      expect(await Promise.all([first, second])).toEqual([true, true]);
+      expect(readFileSync(count, "utf8")).toBe("x");
+    } finally {
+      now.mockRestore();
     }
   });
 

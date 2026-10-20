@@ -462,22 +462,23 @@ export function clearSignInCache(): void {
 /**
  * Whether the tool is signed in to a plan, from its own status command, which
  * makes no model call. It runs with a call's environment, so CLAUDE_CONFIG_DIR
- * and CODEX_HOME pick the same account a call uses. A signed-out answer is
- * read again after two seconds, so signing in shows on the next check, and a
- * signed-in one after a minute.
+ * and CODEX_HOME pick the same account a call uses. A read still running is
+ * shared, a signed-out answer is read again after two seconds, so signing in
+ * shows on the next check, and a signed-in one after a minute. Never rejects.
  */
 export function cliSignedIn(target: CliTarget): Promise<boolean | null> {
   const home = process.env[target.provider === "anthropic" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME"];
   const key = [target.provider, target.command, home ?? ""].join("\0");
   const now = Date.now();
   const held = signInReads().get(key);
-  if (
-    held &&
-    (now - held.at < ANY_FRESH_MS || (held.result === true && now - held.at < SIGNED_IN_FRESH_MS))
-  ) {
-    return held.value;
+  if (held) {
+    const age = now - held.at;
+    const running = !("result" in held);
+    if (running || age < ANY_FRESH_MS || (held.result === true && age < SIGNED_IN_FRESH_MS)) {
+      return held.value;
+    }
   }
-  const read: SignInRead = { at: now, value: readSignIn(target) };
+  const read: SignInRead = { at: now, value: readSignIn(target).catch(() => null) };
   void read.value.then((result) => {
     read.result = result;
   });
@@ -488,11 +489,11 @@ export function cliSignedIn(target: CliTarget): Promise<boolean | null> {
 /**
  * `claude auth status` prints JSON with `loggedIn`, and `codex login status`
  * prints "Logged in using ChatGPT" or "Not logged in" on stderr. Both exit 1
- * signed out. Codex signed in another way, such as with an API key, bills
- * that and not a plan, so only ChatGPT counts. Null when the answer cannot be
- * read, so a version whose status command changed is never shown as signed
- * out. Only the yes or no leaves here: Claude Code's status also prints the
- * account's email.
+ * signed out. Codex signed in another way ("Logged in using an API key",
+ * "API key configured") bills that and not a plan, so it reads as not signed
+ * in to one. Null when the answer cannot be read, so a version whose status
+ * command changed is never shown as signed out. Only the yes or no leaves
+ * here: Claude Code's status also prints the account's email.
  */
 async function readSignIn(target: CliTarget): Promise<boolean | null> {
   const lookup = lookupLaunch(target.command);
@@ -515,7 +516,9 @@ async function readSignIn(target: CliTarget): Promise<boolean | null> {
     }
   }
   if (/not logged in/i.test(text)) return false;
-  return target.provider === "openai" && /logged in using chatgpt/i.test(text) ? true : null;
+  if (target.provider !== "openai") return null;
+  if (/logged in using chatgpt/i.test(text)) return true;
+  return /logged in using|api key configured/i.test(text) ? false : null;
 }
 
 /** Long enough for Codex to read its catalogue, short enough not to hold the key panel. */
