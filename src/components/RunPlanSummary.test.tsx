@@ -99,11 +99,9 @@ describe("RunPlanSummary", () => {
       />,
     );
     expect(container.textContent).toContain(
-      "This run costs $0. Its calls count against your Claude and ChatGPT plans.",
+      "This run costs $0. Its calls count against the usage limits of your Claude and ChatGPT plans.",
     );
-    expect(container.textContent).toContain(
-      "They count against your plan's usage limits instead of a bill.",
-    );
+    expect(container.textContent).toContain("Nothing is billed.");
     expect(container.textContent).not.toContain("your own keys");
     expect(container.textContent).not.toContain("You pay the provider directly.");
   });
@@ -129,7 +127,7 @@ describe("RunPlanSummary", () => {
       "This run will cost about $1.20 on your OpenAI key, at list prices, plus 18 calls on your Claude plan.",
     );
     expect(container.textContent).toContain(
-      "Key calls bill your provider. Plan calls count against the plan's usage limits.",
+      "Key calls bill your provider. Plan calls count against their plan's usage limits.",
     );
   });
 });

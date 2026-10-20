@@ -64,7 +64,7 @@ export function useRunEstimate({
     queryFn: () => getProjectSettings({ data: { projectId } }),
     enabled: hasPlan,
   });
-  const { planProviders, ready: payersKnown } = usePlanProviders();
+  const { planProviders, ready: payersKnown } = usePlanProviders({ enabled: hasPlan });
 
   // Held back until every input has resolved: an estimate that silently omits
   // the extractor while the settings load would show a wrong number next to a

@@ -181,7 +181,8 @@ function Prompts() {
     () => new Map((resultsSummaries.data ?? []).map((row) => [row.promptId, row])),
     [resultsSummaries.data],
   );
-  const { payer } = usePlanProviders();
+  // A summary is one call, by the extraction model.
+  const { payerForOneCall: payer } = usePlanProviders();
   const [summarizing, setSummarizing] = useState<string | null>(null);
 
   const counts = answerCounts.data ?? {};

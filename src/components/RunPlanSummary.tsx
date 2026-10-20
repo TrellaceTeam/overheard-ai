@@ -26,11 +26,9 @@ export function planWithEstimate(plan: RunPlan, spend: RunSpend | null | undefin
 
 /** Who pays for the calls, after the sentence that counts them. */
 function payerSentence(spend: RunSpend | undefined): string {
-  if (spend?.kind === "plans") {
-    return "They count against your plan's usage limits instead of a bill.";
-  }
+  if (spend?.kind === "plans") return "Nothing is billed.";
   if (spend?.kind === "mixed") {
-    return "Key calls bill your provider. Plan calls count against the plan's usage limits.";
+    return "Key calls bill your provider. Plan calls count against their plan's usage limits.";
   }
   return "You pay the provider directly.";
 }
@@ -39,8 +37,8 @@ function MoneySentence({ spend }: { spend: RunSpend }) {
   if (spend.kind === "plans") {
     return (
       <p className="num text-sm">
-        This run costs <span className="font-semibold">$0</span>. Its calls count against{" "}
-        {plansPhrase(spend.plans)}.
+        This run costs <span className="font-semibold">$0</span>. Its calls count against the usage
+        limits of {plansPhrase(spend.plans)}.
       </p>
     );
   }

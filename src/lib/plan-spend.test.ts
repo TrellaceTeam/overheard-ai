@@ -31,6 +31,12 @@ describe("payerPhrase", () => {
       "on your own keys and your Claude plan",
     );
   });
+
+  it("says or for one call that goes to either", () => {
+    expect(payerPhrase(["openai", "anthropic"], CLAUDE_PLAN, "or")).toBe(
+      "on your own keys or your Claude plan",
+    );
+  });
 });
 
 describe("callsByProvider", () => {

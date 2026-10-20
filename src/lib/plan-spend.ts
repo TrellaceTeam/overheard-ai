@@ -39,18 +39,19 @@ export function keysPhrase(keys: readonly string[]): string {
 /**
  * Who pays for calls to these providers, as the end of a sentence: "on your
  * own keys", "on your Claude plan", or "on your own keys and your Claude plan".
- * With no provider to name it keeps the keys wording, which is what the app
- * said before plans existed.
+ * `joiner` is "or" for one call that goes to either. With no provider to name
+ * it says keys, the wording for a call that bills one.
  */
 export function payerPhrase(
   providers: Iterable<string>,
   planProviders: ReadonlySet<string>,
+  joiner: "and" | "or" = "and",
 ): string {
   const unique = [...new Set(providers)];
   const plans = unique.filter((provider) => planProviders.has(provider)).map(planName);
   if (plans.length === 0) return "on your own keys";
   const keyed = unique.some((provider) => !planProviders.has(provider));
-  return keyed ? `on your own keys and ${plansPhrase(plans)}` : `on ${plansPhrase(plans)}`;
+  return keyed ? `on your own keys ${joiner} ${plansPhrase(plans)}` : `on ${plansPhrase(plans)}`;
 }
 
 /**

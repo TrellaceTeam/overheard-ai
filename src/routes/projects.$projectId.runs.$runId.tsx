@@ -201,7 +201,7 @@ function RunDetail() {
   // Present-tense calls (a retry, a summary) go the way this install sends
   // them now. A past run's spend has no stored route, so its line only adds
   // what a plan call logs.
-  const { planProviders, payer } = usePlanProviders();
+  const { planProviders, payer, payerForOneCall, keysBilled } = usePlanProviders();
 
   const allTasks = useMemo(() => detail?.tasks ?? [], [detail]);
   const observations = useMemo(() => detail?.observations ?? [], [detail]);
@@ -536,9 +536,9 @@ function RunDetail() {
             <section className="space-y-3">
               <h3 className="type-section">What the answers say</h3>
               <p className="type-meta max-w-prose">
-                One summary per prompt, written on demand by your extraction model {payer}, at the
-                rough cost on the button. Summaries are prose for a reader and never count in the
-                statistics above.
+                One summary per prompt, written on demand by your extraction model {payerForOneCall}
+                {keysBilled ? ", at the rough cost on the button" : ""}. Summaries are prose for a
+                reader and never count in the statistics above.
               </p>
               {(detail?.promptSummaries ?? []).map((row) => (
                 <PromptSummaryCard
