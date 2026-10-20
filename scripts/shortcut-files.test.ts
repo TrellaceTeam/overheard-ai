@@ -7,7 +7,11 @@ import { linuxDesktopEntry, macAppleScript, macCommand, windowsShortcut } from "
 
 const staged: string[] = [];
 afterAll(() => {
-  for (const folder of staged) rmSync(folder, { recursive: true, force: true });
+  // Windows holds a folder for a moment after the stand-in Node that ran in it
+  // exits (EBUSY or EPERM), so the delete retries, for about three seconds.
+  for (const folder of staged) {
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
 });
 
 describe("windowsShortcut", () => {
