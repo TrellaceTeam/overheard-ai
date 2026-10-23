@@ -7,6 +7,7 @@ Python 3.9 or later.
   python overheard.py setup-check
   python overheard.py start --assistant claude --model sonnet
   python overheard.py check
+  python overheard.py retry q01-2
   python overheard.py build --open
 
 The counting rules follow Overheard AI's finalize_run and lib/metrics.ts, and
@@ -259,8 +260,12 @@ def cmd_start(folder: Path, args) -> int:
     print(f"Run folder: runs/{run_dir.name} ({state}). {len(todo)} answers to collect.")
     print("Ask each one in its own fresh helper. Give the helper only the question and the path.\n")
     for job in todo:
-        print(f"[{job['id']}] save to {run_dir.resolve() / (job['id'] + '.md')}\n{job['text']}\n")
+        print_job(run_dir, job)
     return 0
+
+
+def print_job(run_dir: Path, job: dict) -> None:
+    print(f"[{job['id']}] save to {run_dir.resolve() / (job['id'] + '.md')}\n{job['text']}\n")
 
 
 # ------------------------------------------------------------------ check
@@ -313,13 +318,13 @@ def job_state(run_dir: Path, job: dict) -> dict:
     state["urls"] = answer_urls(state["answer"])
     if not state["answer"].strip():
         state["status"] = "empty"
-        state["problems"].append(f"{job['id']}.md is empty. Ask it again.")
+        state["problems"].append(f"{job['id']}.md is empty. Run retry {job['id']} and ask it again.")
         return state
     if not state["urls"]:
         state["status"] = "no_sources"
         state["problems"].append(
-            f"{job['id']}.md shows no sources, so it may not have searched. Ask it again once. "
-            f"If it still has none, write the reason to {job['id']}.failed.txt."
+            f"{job['id']}.md shows no sources, so it may not have searched. Run retry {job['id']} and ask it "
+            f"again once. If the new answer still has none, write the reason to {job['id']}.failed.txt."
         )
         return state
     reader = read_perception if job["id"] == "perception" else read_reading
@@ -567,9 +572,35 @@ def cmd_setup_check(folder: Path, args) -> int:
         print(f"problem: {problem}")
     for note in setup_notes(setup):
         print(f"note: {note}")
+    if problems:
+        print(f"{SETUP_FILE}: {plural(len(problems), 'problem')}.")
+        return 1
     jobs = len(setup["questions"]) * setup["repeats"] + (1 if setup["perception"] else 0)
-    print(f"{SETUP_FILE}: {len(problems)} problems. Each run asks {jobs} questions.")
-    return 1 if problems else 0
+    print(f"{SETUP_FILE}: 0 problems. Each run asks {jobs} questions.")
+    return 0
+
+
+def cmd_retry(folder: Path, args) -> int:
+    require_setup(folder)
+    runs = list_runs(folder)
+    if not runs:
+        print("No run yet. Start one with: overheard.py start")
+        return 1
+    run_dir, run = runs[-1]
+    job = next((j for j in run_jobs(run) if j["id"] == args.id), None)
+    if not job:
+        raise SetupError(f"{args.id} isn't an answer in run {run_dir.name}.")
+    answer = run_dir / f"{job['id']}.md"
+    if answer.exists():
+        # A helper can't overwrite a file it hasn't read, so the old answer moves aside.
+        answer.replace(run_dir / f"{job['id']}.retried.md")
+        print(f"Set {answer.name} aside as {job['id']}.retried.md.")
+    reading = run_dir / f"{job['id']}.json"
+    if reading.exists():
+        reading.unlink()
+    print("Ask it again in a fresh helper:\n")
+    print_job(run_dir, job)
+    return 0
 
 
 # --------------------------------------------------------------- dashboard
@@ -792,10 +823,18 @@ def main(argv: list[str] | None = None) -> int:
     start.add_argument("--model", default="", help="the model the helpers use, as the app names it")
     check = sub.add_parser("check", help="list what the latest run still needs")
     check.add_argument("--run", help="a run folder name, such as 2026-10-23")
+    retry = sub.add_parser("retry", help="set one answer of the latest run aside so it can be asked again")
+    retry.add_argument("id", help="the answer's id, such as q01-2 or perception")
     build = sub.add_parser("build", help="score every run and write dashboard.html")
     build.add_argument("--open", action="store_true", help="open the dashboard afterwards")
     args = parser.parse_args(argv)
-    commands = {"setup-check": cmd_setup_check, "start": cmd_start, "check": cmd_check, "build": cmd_build}
+    commands = {
+        "setup-check": cmd_setup_check,
+        "start": cmd_start,
+        "check": cmd_check,
+        "retry": cmd_retry,
+        "build": cmd_build,
+    }
     try:
         return commands[args.command](Path(args.folder), args)
     except SetupError as error:

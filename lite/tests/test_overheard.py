@@ -202,6 +202,12 @@ class Folder(unittest.TestCase):
         for words in ("assistant: must be one of", "'acme' isn't a website domain", "needs a unique id", "needs text", "repeats:"):
             self.assertIn(words, out)
 
+    def test_setup_check_survives_a_repeats_that_isnt_a_number(self):
+        (self.folder / "overheard.json").write_text(json.dumps(dict(SETUP, repeats="two")), encoding="utf-8")
+        code, out = run_cli("--folder", str(self.folder), "setup-check")
+        self.assertEqual(code, 1)
+        self.assertIn("overheard.json: 1 problem.", out)
+
     def test_setup_check_notes_a_question_that_names_your_brand(self):
         code, out = run_cli("--folder", str(self.folder), "setup-check")
         self.assertEqual(code, 0)
@@ -239,6 +245,21 @@ class Folder(unittest.TestCase):
         code, out = run_cli("--folder", str(self.folder), "check", "--run", "2026-10-01")
         self.assertEqual(code, 0)
         self.assertIn("7 of 7 done, 0 failed, 0 problems", out)
+
+    def test_retry_sets_an_answer_aside_so_a_helper_can_write_it_again(self):
+        two_runs(self.folder)
+        answer(self.folder, "2026-10-08", "q03-2", "No links here.", [("Contoso Insights", None)])
+        code, out = run_cli("--folder", str(self.folder), "retry", "q03-2")
+        self.assertEqual(code, 0)
+        run_dir = self.folder / "runs" / "2026-10-08"
+        self.assertFalse((run_dir / "q03-2.md").exists())
+        self.assertFalse((run_dir / "q03-2.json").exists())
+        self.assertEqual((run_dir / "q03-2.retried.md").read_text(encoding="utf-8"), "No links here.")
+        self.assertIn(f"[q03-2] save to {(run_dir / 'q03-2.md').resolve()}", out)
+        self.assertIn("Which search platform should a retailer pick?", out)
+        _, out = run_cli("--folder", str(self.folder), "check")
+        self.assertIn("problem: q03-2: no answer yet. Ask it.", out)
+        self.assertEqual(run_cli("--folder", str(self.folder), "retry", "q09-1")[0], 2)
 
     def test_check_flags_a_reading_that_missed_a_tracked_brand(self):
         two_runs(self.folder)

@@ -2,7 +2,7 @@
 
 **See what Claude or ChatGPT says about your brand, with the AI app you already pay for.**
 
-Overheard Lite is the light version of [Overheard AI](../README.md). There's no app to install and no API key. You make a folder, open it in the Code tab of the Claude app or in Codex in the ChatGPT app, and paste one line. Your assistant sets it up with you, asks a handful of buyer questions on a schedule, saves every answer in the folder, and keeps a dashboard up to date. It counts brands the same way Overheard AI does.
+Overheard Lite is the light version of [Overheard AI](../README.md). There's no app to install and no API key. You make a folder, open it in the Code tab of the Claude app or in Codex in the ChatGPT app, and paste one line. Your assistant sets it up with you, asks a handful of buyer questions on a schedule, saves every answer in the folder, and keeps a dashboard up to date. It counts brands by Overheard AI's rules.
 
 ![The dashboard for a fictional brand: how often it's named, ranked in the top 3 and linked, the trend over four runs, and the brands named beside it](docs/dashboard.png)
 
@@ -27,7 +27,7 @@ You need Python 3.9 or later, which most Macs have. On Windows, the assistant of
 3. Your assistant reads each answer into a short list of the brands it names, in order.
 4. A script checks every file, counts the results and rebuilds `dashboard.html`.
 
-By default each question is asked twice, so a run is 13 helpers. In our tests a run of 4 helpers took one to two minutes, so expect a few minutes. A run counts against your plan's usage limits like a long chat. Scheduled runs happen only while the app is open and your computer is awake. A run missed while the computer slept happens once when it wakes.
+By default each question is asked twice, so a run is 13 helpers. In our tests a run of 4 helpers took one to two minutes, so expect a few minutes. A run counts against your plan's usage limits like a long chat. Scheduled runs happen only while the app is open and your computer is awake. The Claude app runs a missed task once when the computer wakes.
 
 ## What it measures
 
@@ -38,6 +38,8 @@ By default each question is asked twice, so a run is 13 helpers. In our tests a 
 | Linked | name you and link one of your domains |
 
 Share of voice divides a brand's mentions by every brand mention in the same answers. Questions that name your own brand are asked but never counted, and a question whose answers name no brand at all adds nothing. These are Overheard AI's rules, and the tests run the app's own scoring fixtures through this version.
+
+One rule is simpler here. Lite counts an answer as linking you when it names you and links your site anywhere, sources included. The app counts only a link the answer attaches to your name, so Lite's Linked can read a little higher.
 
 The dashboard also shows how the assistant describes you, every answer in full, and the brands it names that you don't track yet.
 

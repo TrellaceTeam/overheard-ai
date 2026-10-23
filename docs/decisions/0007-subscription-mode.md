@@ -62,6 +62,8 @@ and both are built to run non-interactively (`claude -p`, `codex exec`).
 - **The desktop apps' scheduled tasks.** One agent session asking forty questions sees its own
   earlier answers, so the repeats stop being independent. It can skip or merge answers, and
   nothing checks that each one searched. The schedules also depend on the app being open.
+  [ADR 0009](0009-overheard-lite.md) takes this route for Overheard Lite, with a fresh helper
+  agent per question and a sources check, and keeps the app as it is.
 - **Reading the plan's sign-in token and calling the API with it.** Anthropic forbids a third
   party collecting or using Claude.ai credentials, and it would break the first time a token
   format changed.

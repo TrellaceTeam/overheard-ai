@@ -84,13 +84,13 @@ Run Overheard in this folder with the overheard skill. Follow its run steps and 
 - **ChatGPT app, Codex.** When you can create scheduled tasks, create a standalone task for this project, on their schedule, with that prompt. Otherwise ask them to open **Scheduled** in the sidebar and add a task for this project with that prompt and schedule.
 - **A terminal only.** Give them the line for their system's scheduler, run in this folder: `claude -p "<the prompt>"` or `codex exec "<the prompt>"`.
 
-Tell them scheduled runs happen only while the app is open and the computer is awake. A run missed while the computer slept happens once when it wakes.
+Tell them scheduled runs happen only while the app is open and the computer is awake. The Claude app runs a missed task once when the computer wakes.
 
 ## 6. Start the first run in a fresh session
 
 The helper agent loads when a session starts, so the first run happens in a new session, not this one. Both apps read this folder's settings and its helper only once the person trusts the folder. The apps ask when the folder is opened or the task is created. In a terminal, they run `claude` or `codex` once in the folder and accept the trust question.
 
-- With a schedule in the Claude or ChatGPT app: ask them to open the task and click **Run now**. When the run stops to ask permission for a step, they choose to always allow it, so later runs never stall.
+- With a schedule in the Claude or ChatGPT app: ask them to open the task and click **Run now**. The kit already allows Overheard's own steps in Claude Code: its Python script, web search, and writing files in `runs/`. When the run stops to ask about one of those, they choose to always allow it, so later runs never stall. When it asks about anything else, they deny it, because a run never needs more.
 - Otherwise: ask them to start a new session in this folder and paste this line:
 
 ```
