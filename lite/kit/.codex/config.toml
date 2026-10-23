@@ -1,0 +1,6 @@
+# Overheard Lite: live web search, so answers reflect today's web, and no memories in this folder.
+web_search = "live"
+
+[memories]
+use_memories = false
+generate_memories = false

@@ -1,0 +1,45 @@
+name: Lite
+
+on:
+  push:
+    paths:
+      - "lite/**"
+      - "src/server/logic/__fixtures__/finalize-run/**"
+      - ".github/workflows/lite.yml"
+  pull_request:
+    paths:
+      - "lite/**"
+      - "src/server/logic/__fixtures__/finalize-run/**"
+      - ".github/workflows/lite.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.13"]
+        include:
+          # The oldest Python the skill promises to run on.
+          - os: ubuntu-latest
+            python: "3.9"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      # The tests also run the app's finalize-run fixtures through the lite
+      # scorer, so a change to either side's counting rules fails here.
+      - name: Tests
+        run: python -m unittest discover -s lite/tests -v

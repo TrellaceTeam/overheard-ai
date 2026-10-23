@@ -39,6 +39,10 @@ npm run shortcut
 No API key, but a Claude or ChatGPT plan? See
 [subscription mode](#subscription-mode-a-claude-or-chatgpt-plan-instead-of-a-key-beta).
 
+Rather not install an app? [Overheard Lite](lite/README.md) is a skill for the Code tab in the
+Claude app or Codex in the ChatGPT app. It measures the one assistant your plan covers, from a
+folder on your computer, with one pasted line to set it up.
+
 In Windows PowerShell, type `npm.cmd` wherever this page says `npm`. PowerShell's default
 execution policy refuses to run `npm`.
 

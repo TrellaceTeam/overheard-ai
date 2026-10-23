@@ -22,3 +22,5 @@ scripts/finalize-run-oracle/out/
 
 # Working screenshots. The README's images live in docs/screenshots/.
 .shots/
+
+__pycache__/

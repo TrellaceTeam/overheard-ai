@@ -1,0 +1,22 @@
+{
+  "autoMemoryEnabled": false,
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Edit(/runs/**)",
+      "Bash(python3 --version)",
+      "Bash(python --version)",
+      "Bash(py -3 --version)",
+      "PowerShell(python3 --version)",
+      "PowerShell(python --version)",
+      "PowerShell(py -3 --version)",
+      "Bash(python3 .claude/skills/overheard/scripts/overheard.py *)",
+      "Bash(python .claude/skills/overheard/scripts/overheard.py *)",
+      "Bash(py -3 .claude/skills/overheard/scripts/overheard.py *)",
+      "PowerShell(python3 .claude/skills/overheard/scripts/overheard.py *)",
+      "PowerShell(python .claude/skills/overheard/scripts/overheard.py *)",
+      "PowerShell(py -3 .claude/skills/overheard/scripts/overheard.py *)"
+    ]
+  }
+}
