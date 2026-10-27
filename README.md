@@ -315,11 +315,14 @@ mainstream adoption. We publish the methods and tools we use because we believe 
   to change, [book a 30-minute GTM Sparring Session][contact].
 - **Investors.** Many of our relationships start with an introduction from a VC. If a company you
   back comes to mind, [make an introduction][contact].
+- **Newsletter.** Last Week in GTM is our weekly newsletter for B2B founders and their investors,
+  out every Tuesday. [Sign up or read past issues][newsletter].
 - **More free tools.** See everything we've published at
   [github.com/TrellaceTeam](https://github.com/TrellaceTeam).
 
 [trellace]: https://www.trellace.com/?utm_source=github&utm_medium=readme&utm_campaign=overheard-ai
 [contact]: https://www.trellace.com/contact?utm_source=github&utm_medium=readme&utm_campaign=overheard-ai
+[newsletter]: https://www.trellace.com/insights?utm_source=github&utm_medium=readme&utm_campaign=overheard-ai
 
 ## License
 
